@@ -13,6 +13,7 @@ import {bulletHitsCage} from './collision.js';
 import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
+import {makeCoinWave, crossedCoin} from './coins.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -119,6 +120,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const objects = [];
     const bullets = [];
     const particles = [];
+    const damageLabels = [];
     const hitSound = createHitSound();
     const notices = createRunnerNotice();
     const collected = [];
@@ -140,8 +142,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let playerHp = 3;
     let shots = 0;
     let kills = 0;
+    let runnerCoins = 0;
     let spawnCount = 0;
     let nextSpawn = 0.5;
+    let nextCoinWave = 1.1;
     let nextGate = 4.2;
     let gateCount = 0;
     let shotTimer = 0;
@@ -153,7 +157,6 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let previous = performance.now();
     const keys = new Set();
     let hurtFlash = 0;
-    let finishHold = null;
 
     function gateText(text, y, width, height, fontSize, color) {
         const canvas = document.createElement('canvas');
@@ -269,6 +272,32 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, hp: 2, hitFlash: 0, group});
         }
     }
+    function spawnCoinWave(goalZ) {
+        for (const item of makeCoinWave()) {
+            if (!canSpawnBeforeGoal(item.z, goalZ, 3)) continue;
+            const group = new THREE.Group();
+            const metal = new THREE.MeshStandardMaterial({
+                color: item.value === 10 ? 0xffcd46 : item.value === 5 ? 0xc4e0ee : 0xc98b50,
+                metalness: 0.75, roughness: 0.25
+            });
+            const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.14, 18), metal);
+            coin.rotation.x = Math.PI / 2;
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.57, 0.075, 6, 20), metal);
+            group.add(coin, rim);
+            const text = gateText(String(item.value), 0, 0.8, 0.6, 188, '#25323a');
+            text.position.z = 0.18;
+            group.add(text);
+            group.position.set(item.x, 1.55, item.z);
+            scene.add(group);
+            objects.push({...item, group});
+        }
+    }
+    function floatDamage(x, y, z, amount) {
+        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 1.8, 0.85, 210, '#ffad93');
+        sprite.position.set(x, y, z);
+        scene.add(sprite);
+        damageLabels.push({sprite, remaining: 0.8});
+    }
     function createFinishGoal() {
         const group = new THREE.Group();
         const gold = material(0xf1cb76);
@@ -325,6 +354,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             bullets.push({mesh, x, z: 6});
         }
         shots++;
+        hitSound.hit('shot');
     }
     function burst(x, y, z, kind = 'impact') {
         const color = kind === 'break' ? 0x7ee6ac : kind === 'upgrade' ? 0x70cfff : 0xffd389;
@@ -346,6 +376,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
+            if (obj.kind === 'coin') continue;
             const hit = obj.kind === 'gate'
                 ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
                 : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
@@ -360,8 +391,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                     updateGate(obj);
                 }
             } else {
+                const dealt = Math.min(Math.max(0, obj.hp), temporary.damage);
                 obj.hp -= temporary.damage;
                 obj.hitFlash = 0.18;
+                floatDamage(obj.x, 3.7, obj.z, dealt);
                 const fraction = Math.max(0, obj.hp / 2);
                 const fill = obj.group.userData.healthFill;
                 fill.scale.x = Math.max(0.001, fraction);
@@ -382,7 +415,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         if (!active) return;
         active = false;
         destroy();
-        onFinish({collected, temporary, kills, shots});
+        onFinish({collected, temporary, kills, shots, coins: runnerCoins});
     }
     function animate(time) {
         if (!active) return;
@@ -425,6 +458,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             spawnGatePair(finishGoal.position.z);
             nextGate += 9.8;
         }
+        if (remaining > 0 && elapsed >= nextCoinWave) {
+            spawnCoinWave(finishGoal.position.z);
+            nextCoinWave += 2.2;
+        }
         for (const marking of markings) {
             marking.position.z += speed * dt;
             if (marking.position.z > 20) marking.position.z -= 320;
@@ -440,6 +477,17 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             const previousZ = obj.z;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
+            if (obj.kind === 'coin') {
+                obj.group.rotation.y += dt * 2.5;
+                if (crossedCoin(player.position.x, player.position.z, previousZ, obj.z, obj.x)) {
+                    runnerCoins += obj.value;
+                    hitSound.hit('coin');
+                    notices.show('+' + obj.value + ' Münzen');
+                    burst(obj.x, 1.7, obj.z, 'upgrade');
+                    removeObject(obj);
+                } else if (obj.z > player.position.z + 2) removeObject(obj);
+                continue;
+            }
             if (obj.kind === 'gate') {
                 if (previousZ <= player.position.z && obj.z >= player.position.z) {
                     const pair = objects.filter(gate => gate.kind === 'gate' && gate.pairId === obj.pairId);
@@ -481,15 +529,25 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 particle.mesh.material.opacity = Math.min(1, particle.life / 0.25);
             }
         }
+        for (let i = damageLabels.length - 1; i >= 0; i--) {
+            const label = damageLabels[i];
+            label.remaining -= dt;
+            label.sprite.position.y += 1.7 * dt;
+            label.sprite.material.opacity = Math.max(0, label.remaining / 0.8);
+            if (label.remaining <= 0) {
+                scene.remove(label.sprite);
+                label.sprite.material.map?.dispose();
+                label.sprite.material.dispose();
+                damageLabels.splice(i, 1);
+            }
+        }
         reportTimer -= dt;
         if (reportTimer <= 0) {
-            onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary, notice: notices.text});
+            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: runnerCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
-        if (remaining <= 0 && finishHold === null) finishHold = 0.8;
-        if (finishHold !== null) finishHold -= dt;
-        if (playerHp <= 0 || (finishHold !== null && finishHold <= 0)) finish();
+        if (playerHp <= 0 || remaining <= 0) finish();
         else frame = requestAnimationFrame(animate);
     }
     function setPointer(event) {
