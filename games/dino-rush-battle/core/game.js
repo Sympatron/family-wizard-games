@@ -80,7 +80,7 @@ export function reduceGame(game, action) {
             };
             run.phase = 'formation';
             return {game: next, message: collected.length
-                ? collected.length + ' Dino(s) gerettet und automatisch aufgestellt. Du kannst die Formation ändern.'
+                ? collected.length + (collected.length === 1 ? ' Dino gerettet und automatisch aufgestellt.' : ' Dinos gerettet und automatisch aufgestellt.') + ' Du kannst die Formation ändern.'
                 : 'Keine neuen Dinos gerettet. Du kannst die Formation trotzdem ändern.'};
         }
         case 'auto-place': {

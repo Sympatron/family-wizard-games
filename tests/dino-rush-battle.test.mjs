@@ -152,3 +152,23 @@ test('an early battle can be won by rescuing and deploying one dinosaur', () => 
     const result = simulateBattle(game.run.army, getEnemies(1));
     assert.equal(result.winner, 'player');
 });
+
+test('rescued units beyond the grid capacity are kept in the reserve', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: Array(20).fill('raptor')});
+    assert.equal(game.run.army.length, 15);
+    assert.equal(game.run.inventory.length, 6);
+    assert.equal(new Set(game.run.army.map(unit => unit.cell)).size, 15);
+    assert.ok(game.run.inventory.every(unit => unit.cell === null));
+    assert.equal(new Set([...game.run.army, ...game.run.inventory].map(unit => unit.id)).size, 21);
+});
+test('new stage collections preserve the positions of surviving dinosaurs', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['pteranodon']});
+    const previous = game.run.army.map(unit => ({id: unit.id, cell: unit.cell}));
+    game = apply(game, 'start-battle');
+    game = apply(game, 'resolve-battle', {winner: 'player', survivors: game.run.army.map(unit => ({id: unit.id, hp: unit.hp}))});
+    game = apply(game, 'next-stage');
+    game = apply(game, 'complete-runner', {collected: ['raptor']});
+    for (const unit of previous) assert.equal(game.run.army.find(dino => dino.id === unit.id).cell, unit.cell);
+    assert.equal(game.run.army.length, 3);
+    assert.equal(game.run.inventory.length, 0);
+});
