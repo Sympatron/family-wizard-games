@@ -1,4 +1,9 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
+let THREE;
+try {
+    THREE = await import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js');
+} catch {
+    THREE = await import('https://unpkg.com/three@0.187.0/build/three.module.js');
+}
 import {SPECIES as DINOSAURS} from '../core/game.js';
 import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
 import {createRanger} from './ranger.js';

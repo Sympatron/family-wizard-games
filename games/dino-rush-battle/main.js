@@ -5,7 +5,6 @@ import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
-import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -20,11 +19,12 @@ const help = document.querySelector('#help');
 const soundToggle = document.querySelector('#sound-toggle');
 function renderSoundToggle() {
     const enabled = isHitSoundEnabled();
+    if (!soundToggle) return;
     soundToggle.textContent = enabled ? 'Ton: An' : 'Ton: Aus';
     soundToggle.setAttribute('aria-pressed', String(enabled));
     soundToggle.setAttribute('aria-label', enabled ? 'Ton ausschalten' : 'Ton einschalten');
 }
-soundToggle.addEventListener('click', () => {
+soundToggle?.addEventListener('click', () => {
     setHitSoundEnabled(!isHitSoundEnabled());
     renderSoundToggle();
 });
@@ -293,12 +293,15 @@ function gameOver() {
     addButton(row, 'Neuen Lauf starten', () => void execute('new-run'));
     actions.append(row);
 }
-function beginRunner() {
+async function beginRunner() {
     const game = state.game;
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
     help.textContent = '← → oder auf der Strecke wischen. Triff Käfige zum Befreien und schieße auf Tore, um ihre Boni zu verbessern.';
-    activeView = startRunner(host, {
+    try {
+        const {startRunner} = await import('./runner/runner.js');
+        if (activePhase !== 'runner') return;
+        activeView = startRunner(host, {
         stage: game.run.stage, upgrades: game.meta.upgrades,
         onProgress: progress => {
             hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
@@ -307,7 +310,14 @@ function beginRunner() {
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
-    });
+        });
+    } catch (error) {
+        if (activePhase !== 'runner') return;
+        heading.textContent = 'Runner konnte nicht gestartet werden';
+        message.textContent = '3D-Spiel konnte nicht geladen werden: ' + error.message;
+        actions.replaceChildren();
+        addButton(actions, 'Erneut versuchen', () => void beginRunner());
+    }
 }
 function apply(snapshot) {
     if (applying || (snapshot.revision === appliedRevision && snapshot.user.id === appliedUser)) return;
@@ -326,7 +336,7 @@ function apply(snapshot) {
             activePhase = phase;
             activeUser = snapshot.user.id;
             message.textContent = '';
-            if (phase === 'runner') beginRunner();
+            if (phase === 'runner') void beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
                     onCell: cell => { if (selected) dropDinosaur(selected, cell); },
