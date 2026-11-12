@@ -174,7 +174,11 @@ function renderFormationStats(unit, run) {
     const card = make('div', 'dino-stat-card');
     card.style.setProperty('--dino-color', '#' + type.color.toString(16).padStart(6, '0'));
     const header = make('div', 'dino-stat-header');
-    const avatar = make('span', 'dino-stat-avatar', type.name.slice(0, 3).toUpperCase());
+    const avatar = make('img', 'dino-stat-avatar');
+    avatar.src = './assets/dinos/' + unit.species + '.svg';
+    avatar.alt = type.name;
+    avatar.width = 56;
+    avatar.height = 46;
     const identity = make('div', 'dino-stat-identity');
     identity.append(make('strong', '', type.name), make('small', '', 'Level ' + unit.level + ' · ' + type.role));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));

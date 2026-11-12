@@ -71,7 +71,7 @@ body {background:#0b1720;color:#eaf5ee;}
 #hud.dino-stats-panel {display:flex;justify-content:center;padding:5px 8px;text-shadow:none;}
 .dino-stat-card {--dino-color:#8bc9a8;display:grid;grid-template-columns:minmax(160px,1.3fr) minmax(140px,1fr) minmax(240px,1.8fr);align-items:center;gap:12px;width:min(100%,860px);padding:9px 12px;background:#152e3a;border:1px solid #467483;border-left:5px solid var(--dino-color);border-radius:13px;box-shadow:0 3px 14px #0006;text-align:left;}
 .dino-stat-header {display:flex;align-items:center;gap:10px;min-width:0;}
-.dino-stat-avatar {flex:0 0 39px;height:39px;display:grid;place-items:center;background:var(--dino-color);color:#11212c;border-radius:50%;font-weight:800;font-size:.73rem;}
+.dino-stat-avatar {flex:0 0 56px;width:56px;height:46px;object-fit:contain;background:#2c4655;border:1px solid var(--dino-color);border-radius:8px;}
 .dino-stat-identity {display:flex;flex-direction:column;min-width:0;line-height:1.25;}
 .dino-stat-identity strong {font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;}
 .dino-stat-identity small {color:#b9d0d7;font-size:.77rem;white-space:nowrap;}
@@ -87,7 +87,7 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stat-card {grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 8px;padding:5px 8px;}
   .dino-stat-grid {grid-column:1/-1;}
   .dino-stat-header {gap:5px;}
-  .dino-stat-avatar {flex-basis:29px;height:29px;font-size:.64rem;}
+  .dino-stat-avatar {flex-basis:38px;width:38px;height:34px;}
   .dino-stat-identity strong {font-size:.9rem;}
   .dino-stat-placement {display:none;}
   .dino-stat-value {padding:3px;}
