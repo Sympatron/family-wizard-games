@@ -30,3 +30,11 @@ export function battleCellAt(x, y, portrait) {
     }
     return null;
 }
+
+export function clientPointToCell(clientX, clientY, rect, portrait) {
+    if (rect.width <= 0 || rect.height <= 0 || clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+    const size = portrait ? BOARD_SIZE.portrait : BOARD_SIZE.landscape;
+    const x = (clientX - rect.left) / rect.width * size.width;
+    const y = (clientY - rect.top) / rect.height * size.height;
+    return battleCellAt(x, y, portrait);
+}
