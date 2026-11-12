@@ -13,10 +13,11 @@ permissions:
 
 concurrency:
   group: games-pages-publish
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,16 +56,18 @@ jobs:
             exit "$status"
           fi
           node stable/scripts/build.mjs --source preview --out site/preview --revision "$revision"
-      - name: Find open same-repository pull requests
+      - name: Find open pull requests
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .number' > open-prs.txt
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" |
+            jq -c '.[] | {number, title, sameRepository: (.head.repo.full_name == .base.repo.full_name)}' > open-prs.jsonl
       - name: Build isolated PR previews
         shell: bash
         run: |
-          while read -r number; do
-            [ -z "$number" ] && continue
+          while IFS= read -r pr; do
+            number="$(jq -r '.number' <<< "$pr")"
+            if [[ "$(jq -r '.sameRepository' <<< "$pr")" != "true" ]]; then continue; fi
             mkdir -p pr-source
             git -C stable fetch --depth=1 origin "refs/pull/$number/head"
             revision="$(git -C stable rev-parse FETCH_HEAD)"
@@ -74,7 +77,9 @@ jobs:
               rm -rf "site/preview/pr-$number"
             fi
             rm -rf pr-source
-          done < open-prs.txt
+          done < open-prs.jsonl
+      - name: Generate preview launcher with open PRs
+        run: node stable/scripts/preview-index.mjs --site site/preview --prs open-prs.jsonl --repository "$GITHUB_REPOSITORY"
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
