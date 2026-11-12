@@ -1,11 +1,11 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
 import {SPECIES as DINOSAURS} from '../core/game.js';
-import {createGatePair, gateLabel, improveGate, applyGate} from './gates.js';
+import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
 import {createRunnerWave} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
-import {finishLinePosition} from './goal.js';
+import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -182,8 +182,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         obj.label = label;
         obj.group.add(label);
     }
-    function spawnGatePair() {
-        for (const [index, definition] of createGatePair(stage, gateCount++).entries()) {
+    function spawnGatePair(goalZ) {
+        if (!canSpawnBeforeGoal(-80, goalZ, 6)) return;
+        const pairId = gateCount++;
+        for (const [index, definition] of createGatePair(stage, pairId).entries()) {
             const x = index === 0 ? -3.2 : 3.2;
             const group = new THREE.Group();
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6.1, 4.1), new THREE.MeshBasicMaterial({
@@ -201,7 +203,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             }
             group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {...definition, kind: 'gate', x, z: -80, charge: 0, mesh, header, group, label: null};
+            const obj = {...definition, kind: 'gate', pairId, x, z: -80, charge: 0, mesh, header, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
@@ -235,10 +237,21 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
         for (const x of [-0.72, 0, 0.72]) bar(0.08, 0.075, 2.85, x, 3.2, 0);
         bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
+        const background = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.37, 0.1),
+            new THREE.MeshBasicMaterial({color: 0x14252c, depthTest: false}));
+        background.position.set(0, 3.72, 1.38);
+        background.renderOrder = 4;
+        const healthFill = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.22, 0.13),
+            new THREE.MeshBasicMaterial({color: 0x65e59b, depthTest: false}));
+        healthFill.position.set(0, 3.72, 1.47);
+        healthFill.renderOrder = 5;
+        group.add(background, healthFill);
+        group.userData.healthFill = healthFill;
         return group;
     }
-    function spawnWave() {
+    function spawnWave(goalZ) {
         for (const item of createRunnerWave(spawnCount++, stage)) {
+            if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
             const group = cage(item.species);
             group.position.set(item.x, 0, item.z);
             scene.add(group);
@@ -321,6 +334,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             } else {
                 obj.hp -= temporary.damage;
                 obj.hitFlash = 0.18;
+                const fraction = Math.max(0, obj.hp / 2);
+                const fill = obj.group.userData.healthFill;
+                fill.scale.x = Math.max(0.001, fraction);
+                fill.position.x = -2.45 * (1 - fraction) / 2;
+                fill.material.color.setHex(fraction > 0.5 ? 0x65e59b : 0xffc16b);
                 if (obj.hp <= 0) {
                     collectDinosaur(obj.species);
                     removeObject(obj);
@@ -366,40 +384,43 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             shoot();
             shotTimer += 0.28 / temporary.fireRate;
         }
+        const speed = 17 + stage * 0.6;
+        finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         if (remaining > 0 && elapsed >= nextSpawn) {
-            spawnWave();
+            spawnWave(finishGoal.position.z);
             nextSpawn += 1.65;
         }
         if (remaining > 0 && elapsed >= nextGate) {
-            spawnGatePair();
+            spawnGatePair(finishGoal.position.z);
             nextGate += 9.8;
         }
-        const speed = 17 + stage * 0.6;
-        finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         for (const marking of markings) {
             marking.position.z += speed * dt;
             if (marking.position.z > 20) marking.position.z -= 320;
+            marking.visible = marking.position.z >= finishGoal.position.z + 1;
         }
         for (const decoration of scenery) {
             decoration.position.z += speed * dt;
             if (decoration.position.z > 22) decoration.position.z -= 294;
+            decoration.visible = decoration.position.z >= finishGoal.position.z + 1;
         }
         for (const obj of [...objects]) {
             if (!objects.includes(obj)) continue;
+            const previousZ = obj.z;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
-            if (obj.kind === 'cage') {
-                obj.hitFlash = Math.max(0, obj.hitFlash - dt);
-                obj.group.scale.setScalar(obj.hitFlash > 0 ? 1.06 : 1);
-            }
-            if (obj.z > 8) {
-                if (obj.kind === 'gate') {
-                    if (Math.abs(player.position.x - obj.x) < 3.05) collectGate(obj);
-                    for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
-                } else {
-                    removeObject(obj);
+            if (obj.kind === 'gate') {
+                if (previousZ <= player.position.z && obj.z >= player.position.z) {
+                    const pair = objects.filter(gate => gate.kind === 'gate' && gate.pairId === obj.pairId);
+                    const selected = selectCrossedGate(pair, player.position.x, previousZ, obj.z, player.position.z);
+                    if (selected) collectGate(selected);
+                    for (const gate of pair) removeObject(gate);
                 }
+                continue;
             }
+            obj.hitFlash = Math.max(0, obj.hitFlash - dt);
+            obj.group.scale.setScalar(obj.hitFlash > 0 ? 1.06 : 1);
+            if (obj.z > player.position.z + 2) removeObject(obj);
         }
         for (let i = bullets.length - 1; i >= 0; i--) {
             const bullet = bullets[i];
