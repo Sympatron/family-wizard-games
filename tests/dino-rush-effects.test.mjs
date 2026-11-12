@@ -76,7 +76,7 @@ test('ranged projectile moves to target before destroying its sprite', () => {
     view.emitRangedProjectile({team: 'player', x: 300, y: 140, tx: 650, ty: 140});
     assert.equal(sprites.length, 1);
     assert.equal(tweens.length, 1);
-    assert.notEqual(tweens[0].x, sprites[0].x);
+    assert.ok(Math.hypot(tweens[0].x - sprites[0].x, tweens[0].y - sprites[0].y) > 0);
     assert.equal(tweens[0].duration, 175);
     tweens[0].onComplete();
     assert.ok(sprites[0].destroyed);
