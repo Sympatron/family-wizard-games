@@ -28,7 +28,9 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.formation #actions {background:#102a3eed;border-radius:15px;margin-top:0;margin-bottom:8px;max-height:none;overflow:visible;}
 .dino-stage.formation #message {margin-top:0;margin-bottom:6px;}
 #actions .unit-picker {display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%;}
-#actions .unit-picker button {font-size:.8rem;padding:8px;}
+#actions .unit-picker button {font-size:.8rem;padding:8px;cursor:grab;}
+#actions .unit-picker button:active {cursor:grabbing;}
+.dino-drag-ghost {position:fixed;z-index:250;transform:translate(-50%,-100%);pointer-events:none;padding:8px 12px;border-radius:10px;background:#f0ca7c;color:#142734;box-shadow:0 8px 20px #0009;font-size:.85rem;font-weight:700;white-space:nowrap;}
 #actions .action-row {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
 .dino-stage.rewards #game-view,.dino-stage.gameover #game-view {display:none;}
 .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {position:relative;min-height:560px;justify-content:center;gap:14px;}
