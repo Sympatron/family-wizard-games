@@ -225,7 +225,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         objects.push({kind, x, z, species, hp: kind === 'cage' ? 2 : kind === 'enemy' ? 2 + Math.floor(stage / 3) : 2, group});
     }
     function spawnWave() {
-        const lanes = [-4.25, 0, 4.25];
+        const lanes = [-3.2, 3.2];
         const first = (spawnCount + stage) % lanes.length;
         const count = spawnCount % 3 === 0 ? 3 : 2;
         for (let i = 0; i < count; i++) {
