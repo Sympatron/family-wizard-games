@@ -5,6 +5,7 @@ import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
 import {createRunnerWave} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
+import {finishLinePosition} from './goal.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -141,6 +142,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let previous = performance.now();
     const keys = new Set();
     let hurtFlash = 0;
+    let finishHold = null;
 
     function gateText(text, y, width, height, fontSize, color) {
         const canvas = document.createElement('canvas');
@@ -364,16 +366,16 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             shoot();
             shotTimer += 0.28 / temporary.fireRate;
         }
-        if (elapsed >= nextSpawn) {
+        if (remaining > 0 && elapsed >= nextSpawn) {
             spawnWave();
             nextSpawn += 1.65;
         }
-        if (elapsed >= nextGate) {
+        if (remaining > 0 && elapsed >= nextGate) {
             spawnGatePair();
             nextGate += 9.8;
         }
         const speed = 17 + stage * 0.6;
-        finishGoal.position.z = player.position.z - speed * remaining;
+        finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         for (const marking of markings) {
             marking.position.z += speed * dt;
             if (marking.position.z > 20) marking.position.z -= 320;
@@ -417,7 +419,9 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
-        if (remaining <= 0 || playerHp <= 0) finish();
+        if (remaining <= 0 && finishHold === null) finishHold = 0.8;
+        if (finishHold !== null) finishHold -= dt;
+        if (playerHp <= 0 || (finishHold !== null && finishHold <= 0)) finish();
         else frame = requestAnimationFrame(animate);
     }
     function setPointer(event) {
@@ -481,7 +485,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         scene.traverse(node => {
             node.geometry?.dispose();
             const materials = Array.isArray(node.material) ? node.material : node.material ? [node.material] : [];
-            for (const m of materials) m.dispose();
+            for (const m of materials) {
+                m.map?.dispose();
+                m.dispose();
+            }
         });
         renderer.forceContextLoss();
         renderer.dispose();
