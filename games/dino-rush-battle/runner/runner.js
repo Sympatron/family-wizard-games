@@ -3,9 +3,9 @@ import {SPECIES as DINOSAURS} from '../core/game.js';
 import {createGatePair, gateLabel, improveGate, applyGate} from './gates.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
+import {createRunnerWave} from './spawns.js';
 
 const DURATION = 35;
-const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
@@ -141,70 +141,103 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const keys = new Set();
     let hurtFlash = 0;
 
-    function label(text) {
+    function gateText(text, y, width, height, fontSize, color) {
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 144;
+        canvas.width = 1024;
+        canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#142734e5';
-        ctx.fillRect(3, 3, 250, 138);
-        ctx.strokeStyle = '#f2e8ba';
-        ctx.lineWidth = 5;
-        ctx.strokeRect(5, 5, 246, 134);
-        const [property, ...effect] = text.split(' ');
-        ctx.fillStyle = '#f4f8dd';
-        ctx.font = 'bold 30px system-ui';
+        ctx.font = '900 ' + fontSize + 'px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(property, 128, 54);
-        ctx.fillStyle = '#ffe39e';
-        ctx.font = 'bold 45px system-ui';
-        ctx.fillText(effect.join(' '), 128, 117);
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 13;
+        ctx.strokeStyle = '#17252b';
+        ctx.strokeText(text, 512, 136, 970);
+        ctx.fillStyle = color;
+        ctx.fillText(text, 512, 136, 970);
         const texture = new THREE.CanvasTexture(canvas);
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
-        sprite.scale.set(2.85, 1.65, 1);
-        sprite.position.set(0, 1.85, 0.24);
+        sprite.scale.set(width, height, 1);
+        sprite.position.set(0, y, 0.35);
         return sprite;
     }
     function updateGate(obj) {
-        obj.mesh.material.color.setHex(obj.level > 0 ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xc0b66b);
-        const old = obj.label;
-        if (old) {
-            obj.group.remove(old);
-            old.material.map.dispose();
-            old.material.dispose();
+        const positive = obj.level > 0;
+        const color = positive ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xd5c774;
+        obj.mesh.material.color.setHex(color);
+        obj.header.material.color.setHex(positive ? 0x256d68 : obj.level < 0 ? 0x873c35 : 0x777044);
+        if (obj.label) {
+            obj.group.remove(obj.label);
+            obj.label.traverse(node => {
+                node.material?.map?.dispose();
+                node.material?.dispose();
+            });
         }
-        obj.label = label(gateLabel(obj));
-        obj.group.add(obj.label);
+        const [type, value] = gateLabel(obj).split(' ');
+        const label = new THREE.Group();
+        label.add(gateText(type, 4.55, 5.8, 0.8, 126, '#ffffff'));
+        label.add(gateText(value, 2.15, 5.75, 2.55, 210, '#fff3a0'));
+        obj.label = label;
+        obj.group.add(label);
     }
     function spawnGatePair() {
-        const definitions = createGatePair(stage, gateCount++);
-        for (const [i, definition] of definitions.entries()) {
-            const x = i === 0 ? -3.2 : 3.2;
+        for (const [index, definition] of createGatePair(stage, gateCount++).entries()) {
+            const x = index === 0 ? -3.2 : 3.2;
             const group = new THREE.Group();
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(3.1, 3.6, 0.35), material(0xcccccc));
-            mesh.position.y = 1.85;
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6.1, 4.1), new THREE.MeshBasicMaterial({
+                color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide
+            }));
+            mesh.position.y = 2.05;
             group.add(mesh);
+            const header = new THREE.Mesh(new THREE.BoxGeometry(6.12, 0.95, 0.42), material(0x647d79));
+            header.position.y = 4.55;
+            group.add(header);
+            for (const side of [-1, 1]) {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 4.1, 0.2), material(0xaac7bf));
+                post.position.set(side * 3.03, 2.05, 0.04);
+                group.add(post);
+            }
             group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {...definition, kind: 'gate', x, z: -80, charge: 0, mesh, group, label: null};
+            const obj = {...definition, kind: 'gate', x, z: -80, charge: 0, mesh, header, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
     }
+    function cage(species) {
+        const group = new THREE.Group();
+        const frame = material(0x6a5843);
+        const iron = new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35});
+        const lock = new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3});
+        function bar(width, height, depth, x, y, z, mat = iron) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+            return mesh;
+        }
+        const creature = dinosaur(species, DINOSAURS[species].color);
+        creature.scale.setScalar(0.68);
+        creature.rotation.y = Math.PI;
+        group.add(creature);
+        bar(2.85, 0.3, 2.85, 0, 0.1, 0, frame);
+        bar(2.85, 0.26, 2.85, 0, 3.05, 0, frame);
+        for (const x of [-1.36, 1.36]) {
+            for (const z of [-1.36, 1.36]) bar(0.18, 3.05, 0.18, x, 1.6, z, frame);
+        }
+        for (const z of [-1.36, 1.36]) {
+            for (const x of [-1.01, -0.67, -0.33, 0, 0.33, 0.67, 1.01]) bar(0.065, 2.8, 0.08, x, 1.59, z);
+            bar(2.8, 0.09, 0.09, 0, 1.58, z);
+        }
+        for (const x of [-1.36, 1.36]) {
+            for (const z of [-0.82, -0.27, 0.27, 0.82]) bar(0.08, 2.8, 0.065, x, 1.59, z);
+        }
+        for (const x of [-0.72, 0, 0.72]) bar(0.08, 0.075, 2.85, x, 3.2, 0);
+        bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
+        return group;
+    }
     function spawnItem(kind, x, z, species) {
         const group = new THREE.Group();
-        if (kind === 'cage' || kind === 'enemy') {
-            const creature = dinosaur(species, kind === 'cage' ? DINOSAURS[species].color : 0xda7766);
-            creature.scale.setScalar(kind === 'cage' ? 0.68 : 0.9);
-            creature.rotation.y = Math.PI;
-            group.add(creature);
-            if (kind === 'cage') {
-                const cage = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.8, 2.6), material(0xf0d28c));
-                cage.position.y = 1.3;
-                cage.material.wireframe = true;
-                group.add(cage);
-            }
-        } else if (kind === 'supply') {
+        if (kind === 'cage') group.add(cage(species));
+        else if (kind === 'supply') {
             const crate = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.65, 1.65), material(0x62b9dc));
             crate.position.y = 0.85;
             group.add(crate);
@@ -222,21 +255,12 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
         group.position.set(x, 0, z);
         scene.add(group);
-        objects.push({kind, x, z, species, hp: kind === 'cage' ? 2 : kind === 'enemy' ? 2 + Math.floor(stage / 3) : 2, group});
+        objects.push({kind, x, z, species, hp: 2, group});
     }
     function spawnWave() {
-        const lanes = [-3.2, 3.2];
-        const first = (spawnCount + stage) % lanes.length;
-        const count = spawnCount % 3 === 0 ? 3 : 2;
-        for (let i = 0; i < count; i++) {
-            const species = SPECIES[(spawnCount + i + Math.floor(stage / 2)) % SPECIES.length];
-            const kind = spawnCount === 0 && i === 0 ? 'cage'
-                : (spawnCount + i) % 7 === 0 ? 'supply'
-                : (spawnCount + i) % 5 === 1 ? 'enemy'
-                : (spawnCount + i) % 5 === 3 ? 'barrier' : 'cage';
-            spawnItem(kind, lanes[(first + i) % lanes.length], -72 - i * 2.5, species);
+        for (const item of createRunnerWave(spawnCount++, stage)) {
+            spawnItem(item.kind, item.x, item.z, item.species);
         }
-        spawnCount++;
     }
     function disposeGroup(group) {
         scene.remove(group);
@@ -271,7 +295,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
-            if (Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 1.55 : 1.2)) continue;
+            if (Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 3.05 : 1.35)) continue;
             if (obj.z < bullet.z - 1.25 || obj.z > previousZ + 1.25) continue;
             if (obj.kind === 'gate') {
                 obj.charge++;
@@ -352,7 +376,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             obj.group.position.z = obj.z;
             if (obj.z > 8) {
                 if (obj.kind === 'gate') {
-                    if (Math.abs(player.position.x - obj.x) < 1.6) collectGate(obj);
+                    if (Math.abs(player.position.x - obj.x) < 3.05) collectGate(obj);
                     for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
                 } else {
                     if (obj.kind === 'supply' && Math.abs(obj.x - player.position.x) < 1.4) temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
