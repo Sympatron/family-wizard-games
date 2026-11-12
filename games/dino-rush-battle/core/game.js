@@ -85,9 +85,10 @@ export function reduceGame(game, action) {
             if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');
             run.money += coins;
             run.phase = 'formation';
-            return {game: next, message: collected.length
+            const rescueMessage = collected.length
                 ? collected.length + (collected.length === 1 ? ' Dino gerettet und automatisch aufgestellt.' : ' Dinos gerettet und automatisch aufgestellt.') + ' Du kannst die Formation ändern.'
-                : 'Keine neuen Dinos gerettet. Du kannst die Formation trotzdem ändern.'};
+                : 'Keine neuen Dinos gerettet. Du kannst die Formation trotzdem ändern.';
+            return {game: next, message: rescueMessage + (coins ? ' +' + coins + ' Münzen eingesammelt.' : '')};
         }
         case 'auto-place': {
             if (run.phase !== 'formation') fail('Du kannst dein Team gerade nicht ändern.');

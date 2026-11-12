@@ -39,6 +39,7 @@ let appliedRevision = -1;
 let appliedUser = null;
 let activeUser = null;
 let applying = false;
+let runnerStartToken = 0;
 const mergeDialog = document.createElement('dialog');
 mergeDialog.className = 'dino-merge-dialog';
 document.body.append(mergeDialog);
@@ -166,6 +167,7 @@ async function refresh() {
     catch (error) { message.textContent = error.message; }
 }
 function cleanup() {
+    runnerStartToken++;
     if (mergeDialog.open) mergeDialog.close();
     activeView?.destroy();
     activeView = null;
@@ -296,6 +298,7 @@ function gameOver() {
     actions.append(row);
 }
 async function beginRunner() {
+    const token = ++runnerStartToken;
     const game = state.game;
     if (pauseToggle) {
         pauseToggle.disabled = true;
@@ -304,10 +307,10 @@ async function beginRunner() {
     }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
-    help.textContent = '← → oder auf der Strecke wischen. Triff Käfige zum Befreien und schieße auf Tore, um ihre Boni zu verbessern.';
+    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Triff Käfige und verbessere Tore durch Schüsse.';
     try {
         const {startRunner} = await import('./runner/runner.js');
-        if (activePhase !== 'runner') return;
+        if (activePhase !== 'runner' || token !== runnerStartToken) return;
         activeView = startRunner(host, {
         stage: game.run.stage, upgrades: game.meta.upgrades,
         onPauseChange: paused => {
@@ -328,7 +331,7 @@ async function beginRunner() {
         });
         if (pauseToggle) pauseToggle.disabled = false;
     } catch (error) {
-        if (activePhase !== 'runner') return;
+        if (activePhase !== 'runner' || token !== runnerStartToken) return;
         heading.textContent = 'Runner konnte nicht gestartet werden';
         message.textContent = '3D-Spiel konnte nicht geladen werden: ' + error.message;
         actions.replaceChildren();

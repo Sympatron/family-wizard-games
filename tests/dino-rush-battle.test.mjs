@@ -214,7 +214,9 @@ test('same-species same-level drops provide two evolution branches', () => {
 });
 
 test('coins collected during runner add to in-run money and reject invalid rewards', () => {
-    let game = apply(fresh(), 'complete-runner', {collected: [], coins: 17});
+    const result = reduceGame(fresh(), {type: 'complete-runner', payload: {collected: [], coins: 17}});
+    assert.match(result.message, /\+17 Münzen eingesammelt/);
+    let game = result.game;
     assert.equal(game.run.money, 17);
     game = apply(game, 'start-battle');
     assert.equal(game.run.money, 17);

@@ -556,13 +556,14 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
         targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 12, -5.15, 5.15);
     }
     function pointerDown(event) {
+        if (clock.paused) return;
         hitSound.unlock();
         dragging = true;
         renderer.domElement.setPointerCapture(event.pointerId);
         setPointer(event);
     }
     function pointerMove(event) {
-        if (dragging) setPointer(event);
+        if (dragging && !clock.paused) setPointer(event);
     }
     function pointerUp() { dragging = false; }
     function setPaused(paused) {
@@ -582,6 +583,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
             togglePause();
             return;
         }
+        if (clock.paused) return;
         if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
             event.preventDefault();
             keys.add(event.code);
@@ -611,6 +613,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
     window.addEventListener('keydown', keyDown);
     window.addEventListener('keyup', keyUp);
     document.addEventListener('visibilitychange', visibilityChange);
+    if (document.hidden) setPaused(true);
     frame = requestAnimationFrame(animate);
     function destroy() {
         cancelAnimationFrame(frame);
