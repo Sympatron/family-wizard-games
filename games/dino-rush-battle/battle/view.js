@@ -12,6 +12,7 @@ export class BattleView {
     constructor(host, {onCell, onSelect, onDrop}) {
         if (!Phaser) throw new Error('Die 2D-Spielengine konnte nicht geladen werden.');
         this.host = host;
+        this.portrait = host.clientWidth < 620;
         this.onCell = onCell;
         this.onSelect = onSelect;
         this.onDrop = onDrop;
@@ -28,10 +29,10 @@ export class BattleView {
         this.game = new Phaser.Game({
             type: Phaser.AUTO,
             parent: host,
-            width: BOARD_WIDTH,
-            height: BOARD_HEIGHT,
+            width: this.portrait ? 540 : BOARD_WIDTH,
+            height: this.portrait ? 880 : BOARD_HEIGHT,
             backgroundColor: '#132938',
-            scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: BOARD_WIDTH, height: BOARD_HEIGHT},
+            scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: this.portrait ? 540 : BOARD_WIDTH, height: this.portrait ? 880 : BOARD_HEIGHT},
             scene: {
                 create() { owner.initialize(this); },
                 update(_time, delta) { owner.update(delta); }
@@ -44,9 +45,11 @@ export class BattleView {
         this.scene = scene;
         const background = scene.add.graphics();
         background.fillStyle(0x213a44, 1);
-        background.fillRoundedRect(16, 44, 456, 386, 15);
+        if (this.portrait) background.fillRoundedRect(14, 546, 512, 260, 15);
+        else background.fillRoundedRect(16, 44, 456, 386, 15);
         background.fillStyle(0x47373f, 1);
-        background.fillRoundedRect(488, 44, 456, 386, 15);
+        if (this.portrait) background.fillRoundedRect(14, 178, 512, 230, 15);
+        else background.fillRoundedRect(488, 44, 456, 386, 15);
         const grid = scene.add.graphics();
         for (const team of ['player', 'enemy']) {
             for (let depth = 0; depth < 3; depth++) {
@@ -59,9 +62,12 @@ export class BattleView {
                 }
             }
         }
-        scene.add.text(245, 16, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
-        scene.add.text(715, 16, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
-        this.hint = scene.add.text(480, 466, '', {fontFamily: 'system-ui', fontSize: '19px', color: '#b4d6d9'}).setOrigin(0.5);
+        scene.add.text(this.portrait ? 270 : 245, this.portrait ? 830 : 16, 'DEIN TEAM',
+            {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
+        scene.add.text(this.portrait ? 270 : 715, this.portrait ? 146 : 16, 'GEGNER',
+            {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
+        this.hint = scene.add.text(this.portrait ? 270 : 480, this.portrait ? 478 : 466, '',
+            {fontFamily: 'system-ui', fontSize: '19px', color: '#b4d6d9'}).setOrigin(0.5);
         scene.input.on('pointerdown', (pointer, objects) => {
             if (this.mode !== 'formation' || objects.some(object => object.getData('unitId'))) return;
             const cell = this.cellAt(pointer.x, pointer.y);
@@ -94,19 +100,24 @@ export class BattleView {
         this.render();
     }
 
+    toScreen(x, y) {
+        return this.portrait ? {x: 72 + (y - FIRST_LANE_Y) * 1.65, y: 480 + (480 - x) * 1.1} : {x, y};
+    }
+
     cellCenter(team, cell) {
         const depth = Math.floor(cell / 5);
         const lane = cell % 5;
         const direction = team === 'player' ? -1 : 1;
-        return {x: FRONT_X[team] + depth * CELL_SPACING_X * direction, y: FIRST_LANE_Y + lane * CELL_SPACING_Y};
+        return this.toScreen(FRONT_X[team] + depth * CELL_SPACING_X * direction, FIRST_LANE_Y + lane * CELL_SPACING_Y);
     }
 
     cellAt(x, y) {
-        const depth = Math.round((FRONT_X.player - x) / CELL_SPACING_X);
-        const lane = Math.round((y - FIRST_LANE_Y) / CELL_SPACING_Y);
-        if (depth < 0 || depth >= 3 || lane < 0 || lane >= 5) return null;
-        const center = this.cellCenter('player', depth * 5 + lane);
-        return Math.abs(center.x - x) <= 30 && Math.abs(center.y - y) <= 27 ? depth * 5 + lane : null;
+        for (let cell = 0; cell < 15; cell++) {
+            const center = this.cellCenter('player', cell);
+            if (Math.abs(center.x - x) <= (this.portrait ? 42 : 30) &&
+                Math.abs(center.y - y) <= (this.portrait ? 32 : 27)) return cell;
+        }
+        return null;
     }
 
     showFormation(army, enemies, selected = null, upgrades = {}) {
@@ -188,9 +199,10 @@ export class BattleView {
     render() {
         if (!this.scene || this.destroyed) return;
         const frame = this.mode === 'formation' ? this.formationUnits() : this.playback?.frames[this.playback.index] ?? [];
-        this.hint.setText(this.mode === 'formation' ? 'Dino auswählen und auf Feld tippen oder ziehen' : 'KAMPF LÄUFT ...');
+        this.hint.setText(this.mode === 'formation' ? (this.portrait ? 'Dino wählen oder ziehen' : 'Dino auswählen und auf Feld tippen oder ziehen') : 'KAMPF LÄUFT ...');
         const visible = new Set();
-        for (const unit of frame) {
+        for (const raw of frame) {
+            const unit = this.portrait && this.mode === 'battle' ? {...raw, ...this.toScreen(raw.x, raw.y)} : raw;
             const key = unit.team + ':' + unit.id;
             visible.add(key);
             const entry = this.units.get(key) ?? this.createUnit(unit);
