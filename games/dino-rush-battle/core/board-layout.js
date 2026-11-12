@@ -1,6 +1,6 @@
 export const BOARD_SIZE = Object.freeze({
-    portrait: {width: 540, height: 560},
-    landscape: {width: 960, height: 560}
+    portrait: {width: 540, height: 620},
+    landscape: {width: 960, height: 620}
 });
 
 const FIRST_LANE_Y = 82;
