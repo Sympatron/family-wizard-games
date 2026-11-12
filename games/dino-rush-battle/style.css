@@ -67,3 +67,35 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-merge-dialog p {margin:0 0 18px;color:#b4d6d9;}
 .dino-merge-options {display:flex;flex-direction:column;gap:8px;}
 .dino-merge-options button {background:#f0ca7c;color:#142734;border:0;padding:12px;border-radius:10px;font-weight:700;}
+
+#hud.dino-stats-panel {display:flex;justify-content:center;padding:5px 8px;text-shadow:none;}
+.dino-stat-card {--dino-color:#8bc9a8;display:grid;grid-template-columns:minmax(160px,1.3fr) minmax(140px,1fr) minmax(240px,1.8fr);align-items:center;gap:12px;width:min(100%,860px);padding:9px 12px;background:#152e3a;border:1px solid #467483;border-left:5px solid var(--dino-color);border-radius:13px;box-shadow:0 3px 14px #0006;text-align:left;}
+.dino-stat-header {display:flex;align-items:center;gap:10px;min-width:0;}
+.dino-stat-avatar {flex:0 0 39px;height:39px;display:grid;place-items:center;background:var(--dino-color);color:#11212c;border-radius:50%;font-weight:800;font-size:.73rem;}
+.dino-stat-identity {display:flex;flex-direction:column;min-width:0;line-height:1.25;}
+.dino-stat-identity strong {font-size:1.05rem;overflow:hidden;text-overflow:ellipsis;}
+.dino-stat-identity small {color:#b9d0d7;font-size:.77rem;white-space:nowrap;}
+.dino-stat-placement {font-size:.68rem;color:#f1dda1;background:#354957;border-radius:8px;padding:4px 6px;white-space:nowrap;}
+.dino-stat-health {display:flex;justify-content:space-between;gap:8px;font-size:.76rem;color:#c8dee0;}
+.dino-stat-health strong {color:#e6f4ec;white-space:nowrap;}
+.dino-stat-meter {width:100%;height:11px;margin-top:6px;accent-color:#6cde9c;}
+.dino-stat-grid {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;}
+.dino-stat-value {display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:7px;background:#254452;padding:6px 4px;}
+.dino-stat-value small {color:#b9d0d7;font-size:.69rem;}
+.dino-stat-value strong {color:#fff1b6;font-size:.93rem;}
+@media (max-width:800px) {
+  .dino-stat-card {grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 8px;padding:5px 8px;}
+  .dino-stat-grid {grid-column:1/-1;}
+  .dino-stat-header {gap:5px;}
+  .dino-stat-avatar {flex-basis:29px;height:29px;font-size:.64rem;}
+  .dino-stat-identity strong {font-size:.9rem;}
+  .dino-stat-placement {display:none;}
+  .dino-stat-value {padding:3px;}
+  .dino-stat-value small {font-size:.64rem;}
+  .dino-stat-value strong {font-size:.83rem;}
+}
+@media (max-width:650px), (max-height:600px) and (pointer:coarse) {
+  .dino-stage.formation #overlay {flex-basis:min(250px,41dvh);}
+  .dino-stage.formation #hud.dino-stats-panel {padding:3px;}
+  .dino-stat-card {gap:3px 6px;}
+}
