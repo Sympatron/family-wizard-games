@@ -1,9 +1,9 @@
 const PRESETS = [
-    {aspect: 0.4, fov: 92, y: 18.5, z: 22.5},
-    {aspect: 0.56, fov: 84, y: 16.6, z: 22.8},
-    {aspect: 1, fov: 68, y: 10, z: 20},
-    {aspect: 1.6, fov: 50, y: 7, z: 20.5},
-    {aspect: 2.2, fov: 46, y: 5.5, z: 19}
+    {aspect: 0.4, fov: 100, y: 18, z: 17},
+    {aspect: 0.56, fov: 96, y: 17, z: 17},
+    {aspect: 1, fov: 70, y: 9.5, z: 17},
+    {aspect: 1.6, fov: 54, y: 6, z: 17},
+    {aspect: 2.2, fov: 48, y: 4.5, z: 17}
 ];
 
 export function runnerCameraSettings(width, height) {
@@ -19,5 +19,5 @@ export function runnerCameraSettings(width, height) {
     }
     const factor = Math.max(0, Math.min(1, (aspect - left.aspect) / (right.aspect - left.aspect)));
     const lerp = key => left[key] + (right[key] - left[key]) * factor;
-    return {fov: lerp('fov'), y: lerp('y'), z: lerp('z'), lookY: 1.5, lookZ: -28, far: 340, fogNear: 85, fogFar: 260};
+    return {fov: lerp('fov'), y: lerp('y'), z: lerp('z'), lookY: 1.5, lookZ: -20, far: 340, fogNear: 85, fogFar: 260};
 }

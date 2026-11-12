@@ -26,3 +26,11 @@ test('camera supports extreme aspect ratios and rejects invalid dimensions', () 
     assert.ok(runnerCameraSettings(100, 900).fov >= runnerCameraSettings(1920, 1080).fov);
     assert.throws(() => runnerCameraSettings(0, 900));
 });
+
+test('camera stands closer to ranger than previous presets for all tested ratios', () => {
+    for (const [width, height] of [[320, 700], [390, 844], [768, 1024], [960, 560], [1920, 1080], [2560, 1080]]) {
+        const settings = runnerCameraSettings(width, height);
+        assert.ok(settings.z >= 15 && settings.z <= 17, width + 'x' + height);
+        assert.ok(settings.z > 10, 'camera should remain behind the followers');
+    }
+});
