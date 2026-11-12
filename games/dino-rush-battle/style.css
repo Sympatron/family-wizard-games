@@ -8,6 +8,7 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage {position:relative;background:linear-gradient(#1d3342,#12242f);border-radius:18px;overflow:hidden;min-height:560px;border:1px solid #345561;}
 #game-view {position:relative;width:100%;height:560px;touch-action:none;}
 #game-view canvas {display:block;width:100%;height:100%;}
+.dino-stage.formation #game-view canvas,.dino-stage.battle #game-view canvas {width:auto;height:auto;max-width:100%;max-height:100%;margin:auto;}
 #overlay {pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;}
 #heading {font-weight:750;font-size:clamp(1.2rem,4vw,2rem);text-align:center;text-shadow:0 2px 6px #000;padding:8px;}
 #hud {width:100%;padding:8px 16px;box-sizing:border-box;text-align:center;text-shadow:0 2px 5px #000;}
@@ -18,7 +19,8 @@ body {background:#0b1720;color:#eaf5ee;}
 #message {margin-top:auto;margin-bottom:12px;max-width:90%;font-size:.95rem;min-height:1.5em;text-shadow:0 1px 5px #000;text-align:center;}
 .dino-help {color:#b8c8d0;text-align:center;font-size:.9rem;}
 .dino-stage.formation #overlay,.dino-stage.rewards #overlay,.dino-stage.gameover #overlay {background:linear-gradient(#0d1721bc,transparent 28%);}
-.dino-stage.formation #actions {background:#102a3edb;border-radius:15px;margin-top:auto;margin-bottom:36px;}
+.dino-stage.formation #actions {background:#102a3eed;border-radius:15px;margin-top:auto;margin-bottom:8px;max-height:145px;overflow-y:auto;}
+.dino-stage.formation #message {margin-top:0;margin-bottom:6px;}
 #actions .unit-picker {display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%;}
 #actions .unit-picker button {font-size:.8rem;padding:8px;}
 #actions .action-row {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}

@@ -67,7 +67,7 @@ export class BattleView {
             for (let depth = 0; depth < 3; depth++) {
                 for (let lane = 0; lane < 5; lane++) {
                     const x = team === 'player' ? 380 - depth * 66 : 580 + depth * 66;
-                    const y = 108 + lane * 72;
+                    const y = 82 + lane * 58;
                     const cell = depth * 5 + lane;
                     const square = scene.add.rectangle(x, y, 62, 64, team === 'player' ? 0x294c52 : 0x593b3f, 0.7);
                     square.setStrokeStyle(1, 0x8eaab0, 0.6);
@@ -99,7 +99,7 @@ export class BattleView {
         return {
             id: unit.id, team, species: unit.species, hp: unit.hp, maxHp: SPECIES[unit.species].hp * (1 + (unit.level - 1) * 0.2),
             x: team === 'player' ? 380 - depth * 66 : 580 + depth * 66,
-            y: 108 + lane * 72
+            y: 82 + lane * 58
         };
     }
     destroy() {

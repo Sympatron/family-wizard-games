@@ -55,7 +55,7 @@ function makeUnit(unit, team, upgrades = {}) {
     return {
         id: unit.id, team, species: unit.species,
         x: team === 'player' ? 380 - depth * 66 : 580 + depth * 66,
-        y: 108 + lane * 72,
+        y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
         speed: species.speed, range: species.range, damage: Math.round(species.damage * (1 + (unit.level - 1) * 0.2)),
         attackTime: species.cooldown, cooldown: 0.2, stunned: 0, attacks: 0

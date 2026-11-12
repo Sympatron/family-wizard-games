@@ -114,7 +114,7 @@ export function reduceGame(game, action) {
             if (winner === 'enemy' || !run.army.some(unit => unit.hp > 0)) {
                 const earned = Math.max(1, run.stage * 5);
                 next.meta.currency += earned;
-                next.run = {...createRun(), phase: 'gameover', lastResult: {stage: run.stage, meta: earned}};
+                next.run = {...createRun(), phase: 'gameover', army: [], inventory: [], lastResult: {stage: run.stage, meta: earned}};
                 return {game: next, message: 'Niederlage! Du erhältst ' + earned + ' Urzeitkristalle.'};
             }
             for (const unit of run.army) {

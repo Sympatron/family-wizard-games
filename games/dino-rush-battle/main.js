@@ -20,6 +20,8 @@ let activeView = null;
 let state = null;
 let selected = null;
 let appliedRevision = -1;
+let appliedUser = null;
+let activeUser = null;
 let applying = false;
 
 function addButton(parent, label, callback, {disabled = false, selected: isSelected = false} = {}) {
@@ -151,17 +153,20 @@ function beginRunner() {
     });
 }
 function apply(snapshot) {
-    if (applying || snapshot.revision === appliedRevision) return;
+    if (applying || (snapshot.revision === appliedRevision && snapshot.user.id === appliedUser)) return;
     applying = true;
     try {
         state = snapshot;
         appliedRevision = snapshot.revision;
+        appliedUser = snapshot.user.id;
         const phase = snapshot.game.run.phase;
+        const previousUser = activeUser;
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
-        if (phase !== activePhase) {
+        if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
+            activeUser = snapshot.user.id;
             message.textContent = '';
             if (phase === 'runner') beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
