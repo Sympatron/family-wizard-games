@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, reduceGame} from '../games/dino-rush-battle/core/game.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
+import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen} from '../games/dino-rush-battle/core/board-layout.js';
 
 const apply = (game, type, payload = {}) => reduceGame(game, {type, payload}).game;
 const fresh = () => structuredClone(INITIAL_GAME);
@@ -82,4 +83,26 @@ test('combat simulation is repeatable and survivors remain within health bounds'
     assert.ok(result.frames.length > 1);
     assert.ok(result.survivors.every(unit => unit.hp > 0 && unit.hp <= SPECIES.ankylosaurus.hp));
     assert.equal(getEnemies(1).length, 4);
+});
+
+test('combat board uses horizontally rotated grids with opponents above the player', () => {
+    for (const portrait of [false, true]) {
+        const size = portrait ? BOARD_SIZE.portrait : BOARD_SIZE.landscape;
+        for (let cell = 0; cell < 15; cell++) {
+            const friendly = battleCellCenter('player', cell, portrait);
+            const enemy = battleCellCenter('enemy', cell, portrait);
+            assert.equal(battleCellAt(friendly.x, friendly.y, portrait), cell);
+            assert.ok(friendly.y > enemy.y);
+            assert.ok(friendly.x > 0 && friendly.x < size.width);
+            assert.ok(enemy.y > 0 && enemy.y < size.height);
+        }
+        const first = battleCellCenter('player', 0, portrait);
+        const nextLane = battleCellCenter('player', 1, portrait);
+        const nextDepth = battleCellCenter('player', 5, portrait);
+        assert.ok(nextLane.x > first.x, 'Five lanes should run from left to right');
+        assert.ok(nextDepth.y > first.y, 'Rear rows should be further down');
+        assert.equal(battleCellAt(-1, -1, portrait), null);
+        const origin = toBattleScreen(480, 198, portrait);
+        assert.ok(origin.x > 0 && origin.y > 0);
+    }
 });

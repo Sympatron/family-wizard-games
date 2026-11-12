@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
 import {SPECIES as DINOSAURS} from '../core/game.js';
 
-const DURATION = 70;
+const DURATION = 35;
 const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
 const GATE_KINDS = ['damage', 'fireRate', 'bullets'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -12,7 +12,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     scene.fog = new THREE.Fog(0x142734, 50, 150);
     const camera = new THREE.PerspectiveCamera(66, 1, 0.1, 250);
     camera.position.set(0, 8, 23);
-    camera.lookAt(0, 1, -17);
+    camera.lookAt(0, 7.5, -17);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
@@ -96,7 +96,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let kills = 0;
     let spawnCount = 0;
     let nextSpawn = 1;
-    let nextGate = 9;
+    let nextGate = 8;
     let shotTimer = 0;
     let reportTimer = 0;
     let targetX = 0;
@@ -268,7 +268,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
         if (elapsed >= nextGate) {
             spawnGatePair();
-            nextGate += 18;
+            nextGate += 14;
         }
         const speed = 12.5 + stage * 0.4;
         for (const marking of markings) {
