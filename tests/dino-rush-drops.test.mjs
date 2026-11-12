@@ -28,3 +28,10 @@ test('different dinosaurs retain normal swapping and placement', () => {
         {type: 'reserve', payload: {id: 'd1'}});
     assert.equal(resolveFormationDrop(run(), 'd1', {cell: 0, unitId: 'd1'}), null);
 });
+
+test('the first board cell is a valid tap target even though its number is zero', () => {
+    assert.deepEqual(resolveFormationDrop(run(), 'd3', 0),
+        {type: 'merge-choice', ids: ['d1', 'd3'], choices: ['allosaurus', 'troodon']});
+    assert.deepEqual(resolveFormationDrop(run(), 'd5', 0),
+        {type: 'place', payload: {id: 'd5', cell: 0}});
+});

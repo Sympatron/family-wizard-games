@@ -1,7 +1,7 @@
 import {getMergeChoices} from './game.js';
 
 export function resolveFormationDrop(run, id, target) {
-    if (!run || !target) return null;
+    if (!run || target === null || target === undefined) return null;
     const drop = Number.isInteger(target) ? {cell: target} : target;
     const pool = [...run.army, ...run.inventory];
     const source = pool.find(unit => unit.id === id);
