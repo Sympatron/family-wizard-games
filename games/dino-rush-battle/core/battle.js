@@ -4,8 +4,8 @@ const TICK = 0.1;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const snapshot = units => units.map(u => ({id: u.id, team: u.team, species: u.species, x: u.x, y: u.y, hp: Math.max(0, u.hp), maxHp: u.maxHp, stunned: u.stunned > 0}));
 
-export function simulateBattle(army, enemies, upgrades = {}) {
-    const units = [...army.map(unit => makeUnit(unit, 'player', upgrades)), ...enemies.map(unit => makeUnit(unit, 'enemy'))];
+export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}) {
+    const units = [...army.map(unit => makeUnit(unit, 'player', upgrades, battleUpgrades)), ...enemies.map(unit => makeUnit(unit, 'enemy'))];
     const frames = [snapshot(units)];
     let winner = null;
     for (let step = 0; step < 600; step++) {
@@ -47,7 +47,7 @@ export function simulateBattle(army, enemies, upgrades = {}) {
     if (!winner) winner = units.reduce((sum, unit) => sum + (unit.team === 'player' ? unit.hp : -unit.hp), 0) > 0 ? 'player' : 'enemy';
     return {winner, frames, survivors: units.filter(u => u.team === 'player').map(u => ({id: u.id, hp: Math.round(u.hp)}))};
 }
-function makeUnit(unit, team, upgrades = {}) {
+function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
     const species = SPECIES[unit.species];
     const depth = Math.floor(unit.cell / 5);
     const lane = unit.cell % 5;
@@ -57,7 +57,7 @@ function makeUnit(unit, team, upgrades = {}) {
         x: team === 'player' ? 380 - depth * 66 : 580 + depth * 66,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
-        speed: species.speed, range: species.range, damage: Math.round(species.damage * (1 + (unit.level - 1) * 0.2)),
+        speed: species.speed, range: species.range, damage: Math.round(species.damage * (1 + (unit.level - 1) * 0.2) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
         attackTime: species.cooldown, cooldown: 0.2, stunned: 0, attacks: 0
     };
 }

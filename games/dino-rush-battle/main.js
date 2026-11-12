@@ -98,7 +98,7 @@ function beginBattle() {
     help.textContent = 'Der Kampf läuft automatisch. Die Aufstellung entscheidet über den Ausgang.';
     actions.replaceChildren();
     const game = state.game;
-    const result = simulateBattle(game.run.army, getEnemies(game.run.stage), game.meta.upgrades);
+    const result = simulateBattle(game.run.army, getEnemies(game.run.stage), game.meta.upgrades, game.run.battleUpgrades);
     activeView.play(result.frames, () => void execute('resolve-battle', {winner: result.winner, survivors: result.survivors}));
     hud.textContent = 'Dein Team gegen die Dinos der Stufe ' + game.run.stage;
 }
@@ -112,6 +112,8 @@ function rewards() {
     const row = document.createElement('div');
     row.className = 'action-row';
     addButton(row, 'Heiltrank kaufen (20)', () => void execute('buy-potion'), {disabled: run.money < 20});
+    const damageCost = 30 + 20 * run.battleUpgrades.damage;
+    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ')', () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
     addButton(row, 'Nächste Stufe', () => void execute('next-stage'));
     actions.append(row);
     const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));

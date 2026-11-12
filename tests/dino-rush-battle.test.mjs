@@ -28,8 +28,10 @@ test('runner collection, formation, branch evolution and battle reward form a st
     game = apply(game, 'buy-potion');
     assert.equal(game.run.money, 15);
     assert.equal(game.run.potions, 1);
+    assert.throws(() => apply(game, 'buy-battle-damage'), /Nicht genug Geld/);
     game = apply(game, 'next-stage');
     assert.equal(game.run.stage, 2);
+    assert.equal(game.run.battleUpgrades.damage, 0);
     assert.equal(game.run.phase, 'runner');
 });
 test('loss resets temporary progress and awards persistent meta currency', () => {

@@ -19,7 +19,7 @@ export function createRun() {
     return {
         phase: 'runner', stage: 1, money: 0, potions: 0, nextId: 2,
         army: [{id: 'd1', species: 'raptor', level: 1, hp: 70, cell: 10}],
-        inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1}, lastResult: null
+        inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1}, battleUpgrades: {damage: 0}, lastResult: null
     };
 }
 export function getEnemies(stage) {
@@ -124,6 +124,14 @@ export function reduceGame(game, action) {
             run.phase = 'rewards';
             run.lastResult = {stage: run.stage, money: 25 + run.stage * 10};
             return {game: next, message: 'Sieg! Deine Dinosaurier erholen sich etwas.'};
+        }
+        case 'buy-battle-damage': {
+            if (run.phase !== 'rewards') fail('Verbesserungen sind nur zwischen den Kämpfen möglich.');
+            const cost = 30 + 20 * run.battleUpgrades.damage;
+            if (run.money < cost) fail('Nicht genug Geld.');
+            run.money -= cost;
+            run.battleUpgrades.damage++;
+            return {game: next, message: 'Dein Team verursacht jetzt mehr Schaden.'};
         }
         case 'buy-potion':
             if (run.phase !== 'rewards' || run.money < 20) fail('Nicht genug Geld.');
