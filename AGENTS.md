@@ -2,7 +2,7 @@
 
 This repository is independent of `Sympatron/family-wizard`. Do not apply the main application's Python/Docker/release-version workflow to standalone games. Read the current `README.md` and these instructions before making changes.
 
-- Use a branch and a focused PR; squash-merge completed PRs only when the PR is mergeable and all required checks have passed. Check GitHub Pages deployment after merging. Report blockers rather than assuming that creating a PR publishes a game.
+- Use a branch and a focused PR; squash-merge completed PRs only when the PR is mergeable and all required checks have passed. Same-repository PRs get isolated GitHub Pages previews at `preview/pr-<number>/` after build validation; fork PRs only run checks. Check the preview deployment and, after merging, stable Pages availability; do not assume a PR builds or deploys before CI completes.
 - Optimize the feedback cycle. GitHub Actions runs only `npm run build` for PRs; pushes to `main` or `dev` deploy static pages. Do not add a full automated test suite, linting gate, Docker or network backend without an explicit request.
 - Keep each game under `games/<id>/` with `game.json` and `index.html`. The launcher is generated from manifests. Shared code belongs in `shared/`; avoid coupling separate games.
 - Native JavaScript modules and zero-dependency site assembly are the baseline. Avoid caching pure file copies. If bundling becomes necessary, compile only changed games and include all relevant sources, shared code and lockfiles in cache invalidation.

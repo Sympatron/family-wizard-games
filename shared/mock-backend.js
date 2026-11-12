@@ -1,4 +1,6 @@
-const ENVIRONMENT = new URL('../', import.meta.url).pathname.includes('/preview/') ? 'preview' : 'stable';
+const SITE_PATH = new URL('../', import.meta.url).pathname;
+const PR_PREVIEW = SITE_PATH.match(/\/preview\/pr-(\d+)\//);
+const ENVIRONMENT = PR_PREVIEW ? `preview-pr-${PR_PREVIEW[1]}` : SITE_PATH.includes('/preview/') ? 'preview' : 'stable';
 const PREFIX = `family-wizard-games:mock:v1:${ENVIRONMENT}`;
 const DEFAULT_USERS = Object.freeze([
     {id: 'alex', name: 'Alex', role: 'user'},
