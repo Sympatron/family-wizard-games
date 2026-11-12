@@ -1,0 +1,69 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, reduceGame} from '../games/dino-rush-battle/core/game.js';
+import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
+
+const apply = (game, type, payload = {}) => reduceGame(game, {type, payload}).game;
+const fresh = () => structuredClone(INITIAL_GAME);
+
+test('runner collection, formation, branch evolution and battle reward form a stage loop', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'raptor', 'triceratops']});
+    assert.equal(game.run.phase, 'formation');
+    assert.equal(game.run.inventory.length, 3);
+    const id = game.run.inventory[0].id;
+    game = apply(game, 'place', {id, cell: 5});
+    assert.equal(game.run.army.find(unit => unit.id === id).cell, 5);
+    assert.equal(game.run.inventory.length, 2);
+    const pair = mergeOptions([...game.run.army, ...game.run.inventory]).find(item => item.species === 'raptor');
+    assert.ok(pair);
+    game = apply(game, 'merge', {ids: pair.ids, into: 'troodon'});
+    assert.equal(game.run.army.filter(unit => unit.species === 'troodon').length, 1);
+    assert.ok(!game.run.army.some(unit => pair.ids.includes(unit.id)));
+    game = apply(game, 'start-battle');
+    assert.equal(game.run.phase, 'battle');
+    game = apply(game, 'resolve-battle', {winner: 'player', survivors: game.run.army.map(unit => ({id: unit.id, hp: 25}))});
+    assert.equal(game.run.phase, 'rewards');
+    assert.equal(game.run.money, 35);
+    assert.ok(game.run.army.every(unit => unit.hp >= 25));
+    game = apply(game, 'buy-potion');
+    assert.equal(game.run.money, 15);
+    assert.equal(game.run.potions, 1);
+    game = apply(game, 'next-stage');
+    assert.equal(game.run.stage, 2);
+    assert.equal(game.run.phase, 'runner');
+});
+test('loss resets temporary progress and awards persistent meta currency', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['pteranodon']});
+    game = apply(game, 'start-battle');
+    game = apply(game, 'resolve-battle', {winner: 'enemy', survivors: []});
+    assert.equal(game.run.phase, 'gameover');
+    assert.equal(game.run.money, 0);
+    assert.equal(game.meta.currency, 5);
+    game = apply(game, 'upgrade', {kind: 'starterHp'});
+    assert.equal(game.meta.currency, 0);
+    game = apply(game, 'new-run');
+    assert.equal(game.run.phase, 'runner');
+    assert.equal(game.run.stage, 1);
+    assert.equal(game.meta.upgrades.starterHp, 1);
+    assert.ok(game.run.army[0].hp > SPECIES.raptor.hp);
+});
+test('invalid placements, merges and out-of-order phases are rejected', () => {
+    const game = fresh();
+    assert.throws(() => apply(game, 'start-battle'));
+    assert.throws(() => apply(game, 'place', {id: 'd1', cell: -1}));
+    const ready = apply(game, 'complete-runner', {collected: ['pteranodon']});
+    assert.throws(() => apply(ready, 'merge', {ids: ['d1', 'd2'], into: 'troodon'}));
+    assert.throws(() => apply(ready, 'place', {id: 'd2', cell: 16}));
+});
+test('combat simulation is repeatable and survivors remain within health bounds', () => {
+    const game = fresh();
+    const army = [{...game.run.army[0], species: 'ankylosaurus', hp: SPECIES.ankylosaurus.hp}];
+    const enemies = [{id: 'e1', species: 'raptor', level: 1, cell: 0, hp: 1}];
+    const result = simulateBattle(army, enemies);
+    const again = simulateBattle(army, enemies);
+    assert.equal(result.winner, 'player');
+    assert.deepEqual(result.survivors, again.survivors);
+    assert.ok(result.frames.length > 1);
+    assert.ok(result.survivors.every(unit => unit.hp > 0 && unit.hp <= SPECIES.ankylosaurus.hp));
+    assert.equal(getEnemies(1).length, 4);
+});
