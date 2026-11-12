@@ -164,9 +164,15 @@ function formation() {
     const enemies = getEnemies(run.stage);
     const all = [...run.army, ...run.inventory];
     if (!all.some(unit => unit.id === selected)) selected = all[0]?.id ?? null;
-    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades);
+    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
-    hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
+    const unit = all.find(item => item.id === selected);
+    const type = unit ? SPECIES[unit.species] : null;
+    const damage = unit ? Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15)) : 0;
+    hud.textContent = unit ? type.name + ' · Stufe ' + unit.level + ' · ' + type.role +
+        ' · LP ' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ' · Schaden ' + damage +
+        ' · Reichweite ' + type.range + ' · Tempo ' + type.speed + ' · Angriff alle ' + type.cooldown + 's' :
+        '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
     help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
     actions.replaceChildren();
     const picker = document.createElement('div');
