@@ -45,7 +45,7 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stage.formation #hud {padding:1px 3px;font-size:.73rem;}
   .dino-stage.formation #actions {display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:5px;padding:5px;margin:0;max-height:none;overflow:visible;}
   .dino-stage.formation #message {font-size:.72rem;margin:0 0 3px;}
-  .dino-stage.formation .unit-picker,.dino-stage.formation .action-row {display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;width:100%;overflow-x:auto;scrollbar-width:thin;}
+  .dino-stage.formation #actions .unit-picker,.dino-stage.formation #actions .action-row {display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;width:100%;overflow-x:auto;scrollbar-width:thin;}
   .dino-stage.formation #actions button {flex:0 0 auto;white-space:nowrap;padding:7px;font-size:.74rem;}
   .dino-stage.battle #heading,.dino-stage.battle #hud {display:none;}
   .dino-stage.runner #heading {font-size:1.05rem;padding:4px;}

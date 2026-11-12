@@ -84,6 +84,7 @@ function formation() {
     actions.append(picker);
     const row = document.createElement('div');
     row.className = 'action-row';
+    addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
     if (run.army.some(unit => unit.id === selected)) {
         addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
@@ -94,7 +95,6 @@ function formation() {
             addButton(row, SPECIES[option.species].name + ' → ' + SPECIES[into].name, () => void execute('merge', {ids: option.ids, into}));
         }
     }
-    addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     actions.append(row);
 }
 function beginBattle() {
