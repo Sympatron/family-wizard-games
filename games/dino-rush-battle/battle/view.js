@@ -19,6 +19,7 @@ export class BattleView {
         this.upgrades = {};
         this.mode = 'formation';
         this.playback = null;
+        this.lastShotFrame = -1;
         this.hitSound = createHitSound();
         this.previousHp = new Map();
         this.units = new Map();
@@ -243,6 +244,7 @@ export class BattleView {
     play(frames, complete) {
         this.hitSound?.unlock();
         this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
+        this.lastShotFrame = -1;
         this.mode = 'battle';
         this.playback = {frames, index: 0, elapsed: 0, complete};
         this.render();
@@ -286,7 +288,7 @@ export class BattleView {
         return [...player, ...enemy, ...this.reserveUnits()];
     }
 
-    emitHitSparks(raw) {
+    emitHitSparks(raw, damage = 0) {
         if (!this.scene?.tweens) return;
         const {x, y} = this.toScreen(raw.x, raw.y);
         for (let index = 0; index < 7; index++) {
@@ -299,7 +301,28 @@ export class BattleView {
                 onComplete: () => spark.destroy()
             });
         }
+        if (damage > 0) {
+            const label = this.scene.add.text(x, y - 35, '−' + Math.round(damage), {
+                fontFamily: 'system-ui', fontSize: '22px', fontStyle: 'bold', color: '#ffcf9e',
+                stroke: '#1a2a35', strokeThickness: 4
+            }).setOrigin(0.5).setDepth(22);
+            this.scene.tweens.add({
+                targets: label, y: y - 82, alpha: 0, duration: 650, ease: 'Cubic.Out',
+                onComplete: () => label.destroy()
+            });
+        }
         this.hitSound?.hit('impact');
+    }
+    emitRangedProjectile(shot) {
+        if (!this.scene?.tweens) return;
+        const from = this.toScreen(shot.x, shot.y);
+        const to = this.toScreen(shot.tx, shot.ty);
+        const color = shot.team === 'player' ? 0x7aeaff : 0xffaa7d;
+        const projectile = this.scene.add.circle(from.x, from.y - 8, 6, color).setDepth(19);
+        this.scene.tweens.add({
+            targets: projectile, x: to.x, y: to.y - 8, alpha: 0.25,
+            duration: 175, ease: 'Linear', onComplete: () => projectile.destroy()
+        });
     }
 
     createUnit(unit) {
@@ -307,10 +330,10 @@ export class BattleView {
         const container = scene.add.container(unit.x, unit.y).setDepth(1);
         const shadow = scene.add.ellipse(0, 18, 46, 18, 0x101c23, 0.5);
         const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(67, 54);
-        const selection = scene.add.rectangle(0, -7, 65, 54, 0x15212b, 0).setStrokeStyle(1.5, 0x314c55);
+        const selection = scene.add.ellipse(0, -7, 72, 58, 0xffef8a, 0).setStrokeStyle(0, 0xffef8a);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, sprite, selection, healthBack, health]);
+        container.add([shadow, selection, sprite, healthBack, health]);
         const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
@@ -320,6 +343,10 @@ export class BattleView {
         if (!this.scene || this.destroyed) return;
         const frame = this.mode === 'formation' ? this.formationUnits() : this.playback?.frames[this.playback.index] ?? [];
         const isFormation = this.mode === 'formation';
+        if (!isFormation && this.playback && this.playback.index !== this.lastShotFrame) {
+            this.lastShotFrame = this.playback.index;
+            for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
+        }
         this.hint.setText(isFormation ? 'Dino wählen oder ziehen' : 'KAMPF LÄUFT ...');
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
@@ -336,7 +363,7 @@ export class BattleView {
             const key = unit.team + ':' + unit.id;
             if (!isFormation) {
                 const previous = this.previousHp?.get(key);
-                if (previous !== undefined && unit.hp < previous) this.emitHitSparks(raw);
+                if (previous !== undefined && unit.hp < previous) this.emitHitSparks(raw, previous - unit.hp);
                 this.previousHp?.set(key, unit.hp);
             }
             visible.add(key);
@@ -348,7 +375,7 @@ export class BattleView {
             entry.container.setAlpha(unit.hp > 0 ? 1 : 0.4);
             entry.sprite.setTint(unit.stunned ? 0xf0d37d : 0xffffff);
             const chosen = unit.id === this.selected && isFormation;
-            entry.selection.setStrokeStyle(chosen ? 4 : 1.5, chosen ? 0xffef8a : 0x314c55);
+            entry.selection.setStrokeStyle(chosen ? 4 : 0, 0xffef8a);
             entry.health.displayWidth = 48 * Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
         }
         for (const [key, entry] of this.units) {
