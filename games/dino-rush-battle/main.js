@@ -1,7 +1,8 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, maxHp, reduceGame} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
+import {resolveFormationDrop} from './core/drops.js';
 import {simulateBattle} from './core/battle.js';
 import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
@@ -57,16 +58,12 @@ function chooseEvolution(ids, choices) {
     mergeDialog.append(title, description, buttons);
     mergeDialog.showModal();
 }
-function dropDinosaur(id, cell) {
-    if (activePhase !== 'formation' || !Number.isInteger(cell)) return;
-    const run = state?.game.run;
-    const pool = [...run.army, ...run.inventory];
-    const source = pool.find(unit => unit.id === id);
-    const target = run.army.find(unit => unit.cell === cell);
-    if (!source || target?.id === id) return;
-    const choices = getMergeChoices(source, target);
-    if (choices.length) chooseEvolution([target.id, source.id], choices);
-    else void execute('place', {id, cell});
+function dropDinosaur(id, target) {
+    if (activePhase !== 'formation') return;
+    const result = resolveFormationDrop(state?.game.run, id, target);
+    if (!result) return;
+    if (result.type === 'merge-choice') chooseEvolution(result.ids, result.choices);
+    else void execute(result.type, result.payload);
 }
 function enableUnitDragging(button, id) {
     button.draggable = true;
@@ -95,7 +92,7 @@ function enableUnitDragging(button, id) {
             next.preventDefault();
             ghost.style.left = next.clientX + 'px';
             ghost.style.top = next.clientY + 'px';
-            activeView?.highlightClient(next.clientX, next.clientY);
+            activeView?.highlightClient(next.clientX, next.clientY, id);
         }
         function cleanup(next, cancelled) {
             if (next.pointerId !== pointerId) return;
@@ -103,9 +100,9 @@ function enableUnitDragging(button, id) {
             window.removeEventListener('pointerup', up);
             window.removeEventListener('pointercancel', cancel);
             ghost?.remove();
-            const cell = !cancelled && dragging ? activeView?.clientCell(next.clientX, next.clientY) : null;
-            activeView?.showDropCell(null);
-            if (cell !== null && cell !== undefined && activePhase === 'formation') dropDinosaur(id, cell);
+            const target = !cancelled && dragging ? activeView?.targetAtClient(next.clientX, next.clientY, id) : null;
+            activeView?.showDropTarget(null);
+            if (target && activePhase === 'formation') dropDinosaur(id, target);
         }
         function up(next) { cleanup(next, false); }
         function cancel(next) { cleanup(next, true); }
@@ -121,15 +118,15 @@ host.addEventListener('dragover', event => {
     activeView?.highlightClient(event.clientX, event.clientY);
 });
 host.addEventListener('dragleave', event => {
-    if (!host.contains(event.relatedTarget)) activeView?.showDropCell(null);
+    if (!host.contains(event.relatedTarget)) activeView?.showDropTarget(null);
 });
 host.addEventListener('drop', event => {
     if (activePhase !== 'formation') return;
     event.preventDefault();
     const id = event.dataTransfer.getData('text/plain');
-    const cell = activeView?.clientCell(event.clientX, event.clientY);
-    activeView?.showDropCell(null);
-    if (id && cell !== null && cell !== undefined) dropDinosaur(id, cell);
+    const target = activeView?.targetAtClient(event.clientX, event.clientY, id);
+    activeView?.showDropTarget(null);
+    if (id && target) dropDinosaur(id, target);
 });
 function paragraph(parent, text) {
     const element = document.createElement('div');
@@ -159,6 +156,45 @@ function cleanup() {
     activeView = null;
     host.replaceChildren();
 }
+function renderFormationStats(unit, run) {
+    hud.replaceChildren();
+    if (!unit) {
+        hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
+        return;
+    }
+    const type = SPECIES[unit.species];
+    const maximum = maxHp(unit, state.game.meta.upgrades);
+    const damage = Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15));
+    const make = (tag, className, content) => {
+        const element = document.createElement(tag);
+        element.className = className;
+        if (content !== undefined) element.textContent = content;
+        return element;
+    };
+    const card = make('div', 'dino-stat-card');
+    card.style.setProperty('--dino-color', '#' + type.color.toString(16).padStart(6, '0'));
+    const header = make('div', 'dino-stat-header');
+    const avatar = make('span', 'dino-stat-avatar', type.name.slice(0, 3).toUpperCase());
+    const identity = make('div', 'dino-stat-identity');
+    identity.append(make('strong', '', type.name), make('small', '', 'Level ' + unit.level + ' · ' + type.role));
+    header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
+    const health = make('div', 'dino-stat-health');
+    health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
+    const meter = make('progress', 'dino-stat-meter');
+    meter.max = maximum;
+    meter.value = unit.hp;
+    meter.setAttribute('aria-label', 'Lebenspunkte');
+    const grid = make('div', 'dino-stat-grid');
+    for (const [label, value] of [
+        ['Schaden', damage], ['Reichweite', type.range], ['Tempo', type.speed], ['Angriff', type.cooldown + ' s']
+    ]) {
+        const stat = make('div', 'dino-stat-value');
+        stat.append(make('small', '', label), make('strong', '', String(value)));
+        grid.append(stat);
+    }
+    card.append(header, health, meter, grid);
+    hud.append(card);
+}
 function formation() {
     const run = state.game.run;
     const enemies = getEnemies(run.stage);
@@ -166,13 +202,7 @@ function formation() {
     if (!all.some(unit => unit.id === selected)) selected = all[0]?.id ?? null;
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
-    const unit = all.find(item => item.id === selected);
-    const type = unit ? SPECIES[unit.species] : null;
-    const damage = unit ? Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15)) : 0;
-    hud.textContent = unit ? type.name + ' · Stufe ' + unit.level + ' · ' + type.role +
-        ' · LP ' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ' · Schaden ' + damage +
-        ' · Reichweite ' + type.range + ' · Tempo ' + type.speed + ' · Angriff alle ' + type.cooldown + 's' :
-        '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
+    renderFormationStats(all.find(item => item.id === selected), run);
     help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
     actions.replaceChildren();
     const picker = document.createElement('div');
@@ -272,6 +302,7 @@ function apply(snapshot) {
         const previousUser = activeUser;
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
+        hud.classList.toggle('dino-stats-panel', phase === 'formation');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
