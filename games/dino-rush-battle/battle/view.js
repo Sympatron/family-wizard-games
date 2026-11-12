@@ -12,6 +12,8 @@ export class BattleView {
         this.onDrop = onDrop;
         this.army = [];
         this.enemies = [];
+        this.inventory = [];
+        this.reservePage = 0;
         this.selected = null;
         this.upgrades = {};
         this.mode = 'formation';
@@ -49,6 +51,15 @@ export class BattleView {
         const grid = scene.add.graphics();
         this.dropMarker = scene.add.graphics().setDepth(5);
         scene.input.dragDistanceThreshold = 8;
+        const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
+        this.reserveBackground = scene.add.rectangle(width / 2, 561, width - 16, 115, 0x223c48, 0.95);
+        this.reserveTitle = scene.add.text(width / 2, 522, 'VORRAT', {fontFamily: 'system-ui', fontSize: '19px', color: '#d7e5f5'}).setOrigin(0.5);
+        this.reserveLeft = scene.add.text(24, 572, '‹', {fontFamily: 'system-ui', fontSize: '44px', color: '#f0ca7c'})
+            .setOrigin(0.5).setInteractive({useHandCursor: true});
+        this.reserveRight = scene.add.text(width - 24, 572, '›', {fontFamily: 'system-ui', fontSize: '44px', color: '#f0ca7c'})
+            .setOrigin(0.5).setInteractive({useHandCursor: true});
+        this.reserveLeft.on('pointerdown', () => this.changeReservePage(-1));
+        this.reserveRight.on('pointerdown', () => this.changeReservePage(1));
         for (const team of ['player', 'enemy']) {
             for (let depth = 0; depth < 3; depth++) {
                 for (let lane = 0; lane < 5; lane++) {
@@ -62,7 +73,7 @@ export class BattleView {
                 }
             }
         }
-        scene.add.text(this.portrait ? 270 : 480, 536, 'DEIN TEAM',
+        scene.add.text(this.portrait ? 270 : 480, 316, 'DEIN TEAM',
             {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
         scene.add.text(this.portrait ? 270 : 480, 20, 'GEGNER',
             {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
@@ -73,8 +84,11 @@ export class BattleView {
             const cell = this.cellAt(pointer.x, pointer.y);
             if (cell !== null) this.onCell(cell);
         });
-        scene.input.on('gameobjectdown', (_pointer, object) => {
-            if (this.mode === 'formation' && object.getData('unitId')) this.dragged = false;
+        scene.input.on('gameobjectdown', (pointer, object) => {
+            if (this.mode !== 'formation' || !object.getData('unitId')) return;
+            this.dragged = false;
+            object.setData('grabOffset', {x: pointer.x - object.x, y: pointer.y - object.y});
+            object.setData('dragOrigin', {x: object.x, y: object.y});
         });
         scene.input.on('gameobjectup', (_pointer, object) => {
             const id = object.getData('unitId');
@@ -85,22 +99,21 @@ export class BattleView {
             this.dragged = true;
             object.setDepth(10);
         });
-        scene.input.on('drag', (_pointer, object, x, y) => {
+        scene.input.on('drag', (pointer, object) => {
             if (this.mode !== 'formation' || !object.getData('unitId')) return;
-            object.setPosition(x, y);
-            this.showDropCell(this.cellAt(x, y));
+            const offset = object.getData('grabOffset') ?? {x: 0, y: 0};
+            object.setPosition(pointer.x - offset.x, pointer.y - offset.y);
+            this.showDropCell(this.cellAt(pointer.x, pointer.y));
         });
-        scene.input.on('dragend', (_pointer, object) => {
+        scene.input.on('dragend', (pointer, object) => {
             const id = object.getData('unitId');
             if (this.mode !== 'formation' || !id) return;
-            const cell = this.cellAt(object.x, object.y);
+            const cell = this.cellAt(pointer.x, pointer.y);
             object.setDepth(1);
             this.showDropCell(null);
+            const origin = object.getData('dragOrigin');
+            if (origin) object.setPosition(origin.x, origin.y);
             const original = this.army.find(unit => unit.id === id);
-            if (original) {
-                const center = this.cellCenter('player', original.cell);
-                object.setPosition(center.x, center.y);
-            }
             if (cell !== null && original?.cell !== cell) this.onDrop(id, cell);
         });
         this.render();
@@ -123,9 +136,28 @@ export class BattleView {
     }
     highlightClient(clientX, clientY) { this.showDropCell(this.clientCell(clientX, clientY)); }
 
-    showFormation(army, enemies, selected = null, upgrades = {}) {
+    get reservePageSize() { return this.portrait ? 7 : 13; }
+    changeReservePage(direction) {
+        const maxPage = Math.max(0, Math.ceil(this.inventory.length / this.reservePageSize) - 1);
+        this.reservePage = Math.max(0, Math.min(maxPage, this.reservePage + direction));
+        this.render();
+    }
+    reserveUnits() {
+        const from = this.reservePage * this.reservePageSize;
+        const visible = this.inventory.slice(from, from + this.reservePageSize);
+        const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
+        const firstX = (width - (visible.length - 1) * 59) / 2;
+        return visible.map((unit, index) => ({
+            id: unit.id, team: 'reserve', species: unit.species, x: firstX + index * 59, y: 568,
+            hp: unit.hp, maxHp: maxHp(unit, this.upgrades)
+        }));
+    }
+
+    showFormation(army, enemies, selected = null, upgrades = {}, inventory = []) {
         this.army = army;
         this.enemies = enemies;
+        this.inventory = inventory;
+        this.reservePage = Math.min(this.reservePage, Math.max(0, Math.ceil(inventory.length / this.reservePageSize) - 1));
         this.selected = selected;
         this.upgrades = upgrades;
         this.mode = 'formation';
@@ -175,7 +207,7 @@ export class BattleView {
             return {id: unit.id, team: 'enemy', species: unit.species, x: center.x, y: center.y,
                 hp: unit.hp, maxHp: unit.hp};
         });
-        return [...player, ...enemy];
+        return [...player, ...enemy, ...this.reserveUnits()];
     }
 
     createUnit(unit) {
@@ -189,7 +221,7 @@ export class BattleView {
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
         container.add([shadow, circle, shortName, healthBack, health]);
-        if (unit.team === 'player') {
+        if (unit.team === 'player' || unit.team === 'reserve') {
             container.setSize(60, 60);
             container.setInteractive(new Phaser.Geom.Circle(30, 30, 30), Phaser.Geom.Circle.Contains);
             container.setData('unitId', unit.id);
@@ -204,6 +236,12 @@ export class BattleView {
         if (!this.scene || this.destroyed) return;
         const frame = this.mode === 'formation' ? this.formationUnits() : this.playback?.frames[this.playback.index] ?? [];
         this.hint.setText(this.mode === 'formation' ? (this.portrait ? 'Dino wählen oder ziehen' : 'Dino auswählen und auf Feld tippen oder ziehen') : 'KAMPF LÄUFT ...');
+        const isFormation = this.mode === 'formation';
+        for (const element of [this.reserveBackground, this.reserveTitle, this.reserveLeft, this.reserveRight]) element.setVisible(isFormation);
+        const pageCount = Math.max(1, Math.ceil(this.inventory.length / this.reservePageSize));
+        this.reserveTitle.setText('VORRAT (' + this.inventory.length + ') · ' + (this.reservePage + 1) + '/' + pageCount);
+        this.reserveLeft.setVisible(isFormation && this.reservePage > 0);
+        this.reserveRight.setVisible(isFormation && this.reservePage < pageCount - 1);
         const visible = new Set();
         for (const raw of frame) {
             const unit = this.mode === 'battle' ? {...raw, ...this.toScreen(raw.x, raw.y)} : raw;
@@ -220,7 +258,7 @@ export class BattleView {
                 unit.id === this.selected && this.mode === 'formation' ? 0xffef8a : 0x15212b);
             entry.health.displayWidth = 48 * Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
             entry.hp = unit.hp;
-            if (entry.team === 'player') {
+            if (entry.team === 'player' || entry.team === 'reserve') {
                 if (this.mode === 'battle') entry.container.disableInteractive();
                 else if (!entry.container.input) {
                     entry.container.setInteractive(new Phaser.Geom.Circle(30, 30, 30), Phaser.Geom.Circle.Contains);
