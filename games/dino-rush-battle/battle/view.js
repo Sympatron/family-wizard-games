@@ -16,6 +16,7 @@ export class BattleView {
         this.currentFrame = null;
         this.interval = null;
         this.scene = null;
+        const owner = this;
         this.game = new Phaser.Game({
             type: Phaser.AUTO,
             parent: host,
@@ -24,9 +25,9 @@ export class BattleView {
             backgroundColor: '#132938',
             scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: BOARD_W, height: BOARD_H},
             scene: {
-                create: () => {
-                    this.scene = this.game.scene.scenes[0];
-                    this.render();
+                create: function () {
+                    owner.scene = this;
+                    owner.render();
                 }
             }
         });
