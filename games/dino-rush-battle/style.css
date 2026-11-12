@@ -107,3 +107,8 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.runner #message {position:absolute;top:86px;left:50%;transform:translateX(-50%);width:max-content;max-width:88%;margin:0;padding:7px 12px;min-height:0;border-radius:10px;background:#102734d9;color:#ffedb1;font-size:clamp(.85rem,2.5vw,1.15rem);font-weight:750;text-align:center;}
 .dino-stage.runner #message:empty {display:none;}
 @media (max-width:650px) {.dino-stage.runner #message {top:67px;padding:5px 8px;}}
+
+#pause-toggle {min-width:60px;font-size:.75rem;font-weight:700;padding:6px 9px;border:1px solid #638b91;border-radius:9px;background:#294956;color:#ebf6e9;cursor:pointer;}
+#pause-toggle[aria-pressed="true"] {background:#655234;color:#fff0c4;}
+#pause-toggle:disabled {opacity:.5;cursor:wait;}
+#pause-toggle:focus-visible {outline:2px solid #f0ca7c;outline-offset:2px;}

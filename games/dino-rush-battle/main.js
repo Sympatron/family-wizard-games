@@ -17,6 +17,7 @@ const stats = document.querySelector('#stats');
 const message = document.querySelector('#message');
 const help = document.querySelector('#help');
 const soundToggle = document.querySelector('#sound-toggle');
+const pauseToggle = document.querySelector('#pause-toggle');
 function renderSoundToggle() {
     const enabled = isHitSoundEnabled();
     if (!soundToggle) return;
@@ -31,6 +32,7 @@ soundToggle?.addEventListener('click', () => {
 renderSoundToggle();
 let activePhase = null;
 let activeView = null;
+pauseToggle?.addEventListener('click', () => activeView?.togglePause?.());
 let state = null;
 let selected = null;
 let appliedRevision = -1;
@@ -295,6 +297,11 @@ function gameOver() {
 }
 async function beginRunner() {
     const game = state.game;
+    if (pauseToggle) {
+        pauseToggle.disabled = true;
+        pauseToggle.textContent = 'Pause';
+        pauseToggle.setAttribute('aria-pressed', 'false');
+    }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
     help.textContent = '← → oder auf der Strecke wischen. Triff Käfige zum Befreien und schieße auf Tore, um ihre Boni zu verbessern.';
@@ -303,6 +310,14 @@ async function beginRunner() {
         if (activePhase !== 'runner') return;
         activeView = startRunner(host, {
         stage: game.run.stage, upgrades: game.meta.upgrades,
+        onPauseChange: paused => {
+            if (pauseToggle) {
+                pauseToggle.textContent = paused ? 'Weiter' : 'Pause';
+                pauseToggle.setAttribute('aria-pressed', String(paused));
+                pauseToggle.setAttribute('aria-label', paused ? 'Runner fortsetzen' : 'Runner pausieren');
+            }
+            message.textContent = paused ? 'Pausiert – mit Weiter oder P fortsetzen' : '';
+        },
         onProgress: progress => {
             hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
                 ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
@@ -311,11 +326,13 @@ async function beginRunner() {
         },
         onFinish: result => void execute('complete-runner', result)
         });
+        if (pauseToggle) pauseToggle.disabled = false;
     } catch (error) {
         if (activePhase !== 'runner') return;
         heading.textContent = 'Runner konnte nicht gestartet werden';
         message.textContent = '3D-Spiel konnte nicht geladen werden: ' + error.message;
         actions.replaceChildren();
+        if (pauseToggle) pauseToggle.disabled = true;
         addButton(actions, 'Erneut versuchen', () => void beginRunner());
     }
 }
@@ -330,6 +347,7 @@ function apply(snapshot) {
         const previousUser = activeUser;
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
+        if (pauseToggle) pauseToggle.hidden = phase !== 'runner';
         hud.classList.toggle('dino-stats-panel', phase === 'formation');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();

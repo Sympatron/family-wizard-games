@@ -14,13 +14,13 @@ import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
-import {frameDeltaSeconds} from './timing.js';
+import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
+export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -156,7 +156,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let active = true;
     let dragging = false;
     let frame = 0;
-    let previous = null;
+    const clock = createRunnerClock();
     const keys = new Set();
     let hurtFlash = 0;
 
@@ -417,8 +417,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function animate(time) {
         if (!active) return;
-        const dt = frameDeltaSeconds(previous, time);
-        previous = time;
+        const dt = clock.tick(time);
+        if (clock.paused) {
+            frame = requestAnimationFrame(animate);
+            return;
+        }
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
         notices.tick(dt);
@@ -562,8 +565,23 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         if (dragging) setPointer(event);
     }
     function pointerUp() { dragging = false; }
+    function setPaused(paused) {
+        if (!active || clock.paused === paused) return;
+        if (paused) clock.pause();
+        else clock.resume();
+        onPauseChange(paused);
+    }
+    function togglePause() { setPaused(!clock.paused); }
+    function visibilityChange() {
+        if (document.hidden) setPaused(true);
+    }
     function keyDown(event) {
         hitSound.unlock();
+        if (event.code === 'KeyP' && !event.repeat) {
+            event.preventDefault();
+            togglePause();
+            return;
+        }
         if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
             event.preventDefault();
             keys.add(event.code);
@@ -592,6 +610,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     renderer.domElement.addEventListener('pointercancel', pointerUp);
     window.addEventListener('keydown', keyDown);
     window.addEventListener('keyup', keyUp);
+    document.addEventListener('visibilitychange', visibilityChange);
     frame = requestAnimationFrame(animate);
     function destroy() {
         cancelAnimationFrame(frame);
@@ -603,6 +622,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         renderer.domElement.removeEventListener('pointercancel', pointerUp);
         window.removeEventListener('keydown', keyDown);
         window.removeEventListener('keyup', keyUp);
+        document.removeEventListener('visibilitychange', visibilityChange);
         for (const obj of [...objects]) removeObject(obj);
         for (const bullet of bullets) {
             scene.remove(bullet.mesh);
@@ -621,5 +641,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         renderer.dispose();
         renderer.domElement.remove();
     }
-    return {destroy: () => { if (active) { active = false; destroy(); } }};
+    return {
+        destroy: () => { if (active) { active = false; destroy(); } },
+        pause: () => setPaused(true),
+        resume: () => setPaused(false),
+        togglePause,
+        get paused() { return clock.paused; }
+    };
 }
