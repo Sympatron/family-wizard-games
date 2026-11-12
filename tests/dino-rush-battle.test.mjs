@@ -10,11 +10,12 @@ const fresh = () => structuredClone(INITIAL_GAME);
 test('runner collection, formation, branch evolution and battle reward form a stage loop', () => {
     let game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'raptor', 'triceratops']});
     assert.equal(game.run.phase, 'formation');
-    assert.equal(game.run.inventory.length, 3);
-    const id = game.run.inventory[0].id;
+    assert.equal(game.run.army.length, 4);
+    assert.equal(game.run.inventory.length, 0);
+    const id = game.run.army.find(unit => unit.id !== 'd1').id;
     game = apply(game, 'place', {id, cell: 5});
     assert.equal(game.run.army.find(unit => unit.id === id).cell, 5);
-    assert.equal(game.run.inventory.length, 2);
+    assert.equal(game.run.inventory.length, 0);
     const pair = mergeOptions([...game.run.army, ...game.run.inventory]).find(item => item.species === 'raptor');
     assert.ok(pair);
     game = apply(game, 'merge', {ids: pair.ids, into: 'troodon'});
@@ -118,4 +119,36 @@ test('combat grids remain separated near the top and bottom of compact boards', 
         assert.ok(Math.max(...top.map(p => p.y)) + 30 < Math.min(...bottom.map(p => p.y)) - 30);
         assert.ok([...top, ...bottom].every(p => p.x > 20 && p.x < width - 20 && p.y > 40 && p.y < height - 40));
     }
+});
+
+test('collected dinosaurs automatically fill free front and rear cells', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'pteranodon', 'triceratops']});
+    assert.equal(game.run.army.length, 4);
+    assert.deepEqual(game.run.army.map(unit => unit.cell), [0, 1, 14, 2]);
+    assert.equal(game.run.inventory.length, 0);
+    const reserved = apply(game, 'reserve', {id: 'd2'});
+    assert.ok(reserved.run.inventory.some(unit => unit.id === 'd2'));
+    assert.deepEqual(reserved.run.army.map(unit => unit.cell), [0, 14, 2]);
+});
+
+test('moving a deployed dinosaur onto an occupied cell swaps rather than reserves', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'triceratops']});
+    const first = game.run.army.find(unit => unit.id === 'd2');
+    const second = game.run.army.find(unit => unit.id === 'd3');
+    const originalFirst = first.cell;
+    const originalSecond = second.cell;
+    game = apply(game, 'place', {id: first.id, cell: originalSecond});
+    assert.equal(game.run.army.find(unit => unit.id === first.id).cell, originalSecond);
+    assert.equal(game.run.army.find(unit => unit.id === second.id).cell, originalFirst);
+    assert.equal(game.run.inventory.length, 0);
+    game = apply(game, 'reserve', {id: second.id});
+    game = apply(game, 'place', {id: second.id, cell: originalSecond});
+    assert.equal(game.run.inventory.length, 1);
+    assert.ok(game.run.inventory.some(unit => unit.id === first.id));
+    assert.equal(game.run.army.find(unit => unit.id === second.id).cell, originalSecond);
+});
+test('an early battle can be won by rescuing and deploying one dinosaur', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: ['raptor']});
+    const result = simulateBattle(game.run.army, getEnemies(1));
+    assert.equal(result.winner, 'player');
 });
