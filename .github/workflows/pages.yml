@@ -1,0 +1,72 @@
+name: Games Pages
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: games-pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'publish' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm run build
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.publish.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: stable
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build stable site
+        run: node stable/scripts/build.mjs --source stable --out site --revision "$(git -C stable rev-parse HEAD)"
+      - name: Build development preview
+        shell: bash
+        run: |
+          mkdir -p preview
+          set +e
+          git -C stable ls-remote --exit-code origin refs/heads/dev >/dev/null
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            git -C stable fetch --depth=1 origin refs/heads/dev
+            git -C stable archive FETCH_HEAD | tar -x -C preview
+            revision="$(git -C stable rev-parse FETCH_HEAD)"
+          elif [ "$status" -eq 2 ]; then
+            cp -R stable/. preview/
+            revision="$(git -C stable rev-parse HEAD)"
+          else
+            exit "$status"
+          fi
+          node preview/scripts/build.mjs --source preview --out site/preview --revision "$revision"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: publish
