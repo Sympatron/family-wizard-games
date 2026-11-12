@@ -12,8 +12,8 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.runner {height:calc(100dvh - 108px);min-height:420px;}
 .dino-stage.runner #game-view {height:100%;}
 .dino-stage.formation #actions .unit-picker button {touch-action:none;}
-.dino-stage.formation,.dino-stage.battle {min-height:560px;}
-.dino-stage.formation #game-view,.dino-stage.battle #game-view {height:560px;}
+.dino-stage.formation,.dino-stage.battle {min-height:620px;}
+.dino-stage.formation #game-view,.dino-stage.battle #game-view {height:620px;}
 #overlay {pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;}
 #heading {font-weight:750;font-size:clamp(1.2rem,4vw,2rem);text-align:center;text-shadow:0 2px 6px #000;padding:8px;}
 #hud {width:100%;padding:8px 16px;box-sizing:border-box;text-align:center;text-shadow:0 2px 5px #000;}
