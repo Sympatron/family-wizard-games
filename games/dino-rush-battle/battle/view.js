@@ -1,5 +1,5 @@
 import {SPECIES, maxHp} from '../core/game.js';
-import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
+import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt, clientPointToCell} from '../core/board-layout.js';
 
 const Phaser = window.Phaser;
 export class BattleView {
@@ -19,6 +19,7 @@ export class BattleView {
         this.units = new Map();
         this.scene = null;
         this.destroyed = false;
+        this.dragged = false;
         const owner = this;
         const size = this.portrait ? BOARD_SIZE.portrait : BOARD_SIZE.landscape;
         this.game = new Phaser.Game({
@@ -46,6 +47,8 @@ export class BattleView {
         if (this.portrait) background.fillRoundedRect(14, 42, 512, 174, 15);
         else background.fillRoundedRect(250, 42, 460, 174, 15);
         const grid = scene.add.graphics();
+        this.dropMarker = scene.add.graphics().setDepth(5);
+        scene.input.dragDistanceThreshold = 8;
         for (const team of ['player', 'enemy']) {
             for (let depth = 0; depth < 3; depth++) {
                 for (let lane = 0; lane < 5; lane++) {
@@ -71,22 +74,28 @@ export class BattleView {
             if (cell !== null) this.onCell(cell);
         });
         scene.input.on('gameobjectdown', (_pointer, object) => {
+            if (this.mode === 'formation' && object.getData('unitId')) this.dragged = false;
+        });
+        scene.input.on('gameobjectup', (_pointer, object) => {
             const id = object.getData('unitId');
-            if (this.mode === 'formation' && id) this.onSelect(id);
+            if (this.mode === 'formation' && id && !this.dragged) this.onSelect(id);
         });
         scene.input.on('dragstart', (_pointer, object) => {
             if (this.mode !== 'formation' || !object.getData('unitId')) return;
+            this.dragged = true;
             object.setDepth(10);
         });
         scene.input.on('drag', (_pointer, object, x, y) => {
             if (this.mode !== 'formation' || !object.getData('unitId')) return;
             object.setPosition(x, y);
+            this.showDropCell(this.cellAt(x, y));
         });
         scene.input.on('dragend', (_pointer, object) => {
             const id = object.getData('unitId');
             if (this.mode !== 'formation' || !id) return;
             const cell = this.cellAt(object.x, object.y);
             object.setDepth(1);
+            this.showDropCell(null);
             const original = this.army.find(unit => unit.id === id);
             if (original) {
                 const center = this.cellCenter('player', original.cell);
@@ -100,6 +109,19 @@ export class BattleView {
     toScreen(x, y) { return toBattleScreen(x, y, this.portrait); }
     cellCenter(team, cell) { return battleCellCenter(team, cell, this.portrait); }
     cellAt(x, y) { return battleCellAt(x, y, this.portrait); }
+    clientCell(clientX, clientY) {
+        const canvas = this.game?.canvas;
+        return canvas ? clientPointToCell(clientX, clientY, canvas.getBoundingClientRect(), this.portrait) : null;
+    }
+    showDropCell(cell) {
+        if (!this.dropMarker) return;
+        this.dropMarker.clear();
+        if (cell === null || this.mode !== 'formation') return;
+        const {x, y} = this.cellCenter('player', cell);
+        this.dropMarker.lineStyle(4, 0xffe59b, 1);
+        this.dropMarker.strokeRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
+    }
+    highlightClient(clientX, clientY) { this.showDropCell(this.clientCell(clientX, clientY)); }
 
     showFormation(army, enemies, selected = null, upgrades = {}) {
         this.army = army;
@@ -108,6 +130,7 @@ export class BattleView {
         this.upgrades = upgrades;
         this.mode = 'formation';
         this.playback = null;
+        this.showDropCell(null);
         this.render();
     }
 
@@ -168,7 +191,7 @@ export class BattleView {
         container.add([shadow, circle, shortName, healthBack, health]);
         if (unit.team === 'player') {
             container.setSize(60, 60);
-            container.setInteractive(new Phaser.Geom.Circle(0, 0, 30), Phaser.Geom.Circle.Contains);
+            container.setInteractive(new Phaser.Geom.Circle(30, 30, 30), Phaser.Geom.Circle.Contains);
             container.setData('unitId', unit.id);
             scene.input.setDraggable(container);
         }
@@ -200,7 +223,7 @@ export class BattleView {
             if (entry.team === 'player') {
                 if (this.mode === 'battle') entry.container.disableInteractive();
                 else if (!entry.container.input) {
-                    entry.container.setInteractive(new Phaser.Geom.Circle(0, 0, 30), Phaser.Geom.Circle.Contains);
+                    entry.container.setInteractive(new Phaser.Geom.Circle(30, 30, 30), Phaser.Geom.Circle.Contains);
                     this.scene.input.setDraggable(entry.container);
                 }
             }
@@ -217,6 +240,7 @@ export class BattleView {
         if (this.destroyed) return;
         this.destroyed = true;
         this.playback = null;
+        this.dropMarker = null;
         this.game.destroy(true);
         this.units.clear();
         this.scene = null;
