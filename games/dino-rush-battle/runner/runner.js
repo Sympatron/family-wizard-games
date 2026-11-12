@@ -1,4 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
+import {SPECIES as DINOSAURS} from '../core/game.js';
 
 const DURATION = 70;
 const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
@@ -27,17 +28,60 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         scene.add(mesh);
         return mesh;
     }
+    function dinosaur(species, color) {
+        const result = new THREE.Group();
+        const skin = material(color);
+        const belly = material(0xe9ca9f);
+        const eyes = material(0x192333);
+        const detail = material(0x415569);
+        function piece(geometry, mat, x, y, z, sx = 1, sy = 1, sz = 1) {
+            const mesh = new THREE.Mesh(geometry, mat);
+            mesh.position.set(x, y, z);
+            mesh.scale.set(sx, sy, sz);
+            result.add(mesh);
+            return mesh;
+        }
+        const sphere = (radius, mat, x, y, z, sx = 1, sy = 1, sz = 1) =>
+            piece(new THREE.SphereGeometry(radius, 10, 8), mat, x, y, z, sx, sy, sz);
+        sphere(0.69, skin, 0, 1.35, 0.1, 1, 0.75, 1.3);
+        sphere(0.48, skin, 0, 1.95, -0.66);
+        sphere(0.39, belly, 0, 1.69, -1.0, 0.9, 0.5, 1.2);
+        for (const side of [-1, 1]) {
+            sphere(0.13, eyes, side * 0.36, 2.09, -0.91);
+            const leg = piece(new THREE.CylinderGeometry(0.17, 0.27, 0.95, 7), skin, side * 0.45, 0.55, 0.33);
+            (result.userData.legs ??= []).push(leg);
+            sphere(0.23, skin, side * 0.46, 0.13, -0.03, 0.8, 0.45, 1.3);
+            sphere(0.16, skin, side * 0.58, 1.39, -0.78, 0.65, 1.1, 0.65);
+        }
+        const tail = piece(new THREE.ConeGeometry(0.42, 2.1, 8), skin, 0, 1.32, 1.36);
+        tail.rotation.x = Math.PI / 2;
+        if (species === 'triceratops') {
+            for (const side of [-1, 1]) {
+                const horn = piece(new THREE.ConeGeometry(0.14, 0.75, 7), belly, side * 0.34, 2.35, -1.02);
+                horn.rotation.x = -0.35;
+            }
+            sphere(0.57, skin, 0, 2.2, -0.38, 1.25, 0.7, 0.36);
+        } else if (species === 'pteranodon') {
+            for (const side of [-1, 1]) {
+                const wing = piece(new THREE.ConeGeometry(0.64, 2.2, 5), skin, side * 1.01, 1.64, 0.2);
+                wing.rotation.z = side * Math.PI / 2;
+            }
+            const beak = piece(new THREE.ConeGeometry(0.22, 0.95, 5), belly, 0, 1.89, -1.27);
+            beak.rotation.x = -Math.PI / 2;
+        } else {
+            for (let i = 0; i < 3; i++) {
+                const spine = piece(new THREE.ConeGeometry(0.18, 0.55, 5), detail, 0, 1.98, 0.2 + i * 0.5);
+                spine.rotation.x = -0.2;
+            }
+        }
+        result.userData.skin = skin;
+        return result;
+    }
     box(8.7, 0.2, 230, 0x395a46, 0, -0.18, -49);
     box(0.25, 1, 230, 0x86b177, -4.5, 0.3, -49);
     box(0.25, 1, 230, 0x86b177, 4.5, 0.3, -49);
     const markings = Array.from({length: 16}, (_, i) => box(0.12, 0.015, 4.2, 0xb5d4a1, 0, 0.01, 12 - i * 9));
-    const player = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.55, 0.7, 4, 8), material(0xf5c768));
-    body.position.y = 1.1;
-    player.add(body);
-    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.38, 0.75, 6), material(0xc26b4b));
-    crest.position.set(0, 2.2, -0.1);
-    player.add(crest);
+    const player = dinosaur('raptor', 0xf5c768);
     scene.add(player);
     player.position.set(0, 0, 8);
 
@@ -61,6 +105,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let frame = 0;
     let previous = performance.now();
     const keys = new Set();
+    let hurtFlash = 0;
 
     function label(text, color = '#f4f8dd') {
         const canvas = document.createElement('canvas');
@@ -116,17 +161,19 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         const isCage = spawnCount % 3 !== 1;
         const x = [-2.6, 0, 2.6][(spawnCount + stage) % 3];
         const group = new THREE.Group();
-        const color = isCage ? 0xeac472 : 0xeb745e;
-        const outer = new THREE.Mesh(new THREE.BoxGeometry(isCage ? 1.9 : 1.4, isCage ? 2.0 : 1.5, 1.6), material(color));
-        outer.position.y = 1.1;
-        outer.material.wireframe = isCage;
-        group.add(outer);
-        const inner = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 8), material(isCage ? 0x77d7ad : 0xa84648));
-        inner.position.y = 1.15;
-        group.add(inner);
+        const species = SPECIES[(spawnCount + Math.floor(stage / 2)) % SPECIES.length];
+        const creature = dinosaur(species, isCage ? DINOSAURS[species].color : 0xda7766);
+        creature.scale.setScalar(isCage ? 0.68 : 0.9);
+        creature.rotation.y = Math.PI;
+        group.add(creature);
+        if (isCage) {
+            const cage = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.75, 2.75), material(0xf0d28c));
+            cage.position.y = 1.2;
+            cage.material.wireframe = true;
+            group.add(cage);
+        }
         group.position.set(x, 0, -100);
         scene.add(group);
-        const species = SPECIES[(spawnCount + Math.floor(stage / 2)) % SPECIES.length];
         objects.push({kind: isCage ? 'cage' : 'enemy', x, z: -100, hp: isCage ? 3 : 2 + Math.floor(stage / 3), species, group});
         spawnCount++;
     }
@@ -143,7 +190,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function removeObject(obj) {
         const i = objects.indexOf(obj);
-        if (i >= 0) objects.splice(i, 1);
+        if (i < 0) return;
+        objects.splice(i, 1);
         disposeGroup(obj.group);
     }
     function shoot() {
@@ -204,6 +252,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         targetX = clamp(targetX, -3.4, 3.4);
         player.position.x = THREE.MathUtils.damp(player.position.x, targetX, 14, dt);
         player.rotation.z = (player.position.x - targetX) * 0.07;
+        player.position.y = Math.sin(elapsed * 13) * 0.05;
+        for (const [index, leg] of player.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 13 + index * Math.PI) * 0.25;
+        hurtFlash = Math.max(0, hurtFlash - dt);
+        player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0xf5c768);
         camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.3, 2.5, dt);
         shotTimer -= dt;
         if (shotTimer <= 0) {
@@ -224,6 +276,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             if (marking.position.z > 18) marking.position.z -= 144;
         }
         for (const obj of [...objects]) {
+            if (!objects.includes(obj)) continue;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
             if (obj.z > 8) {
@@ -231,7 +284,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                     if (Math.abs(player.position.x - obj.x) < 1.25) applyGate(obj);
                     for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
                 } else {
-                    if (obj.kind === 'enemy' && Math.abs(obj.x - player.position.x) < 1.1) playerHp--;
+                    if (obj.kind === 'enemy' && Math.abs(obj.x - player.position.x) < 1.1) {
+                        playerHp--;
+                        hurtFlash = 0.25;
+                    }
                     removeObject(obj);
                 }
             }
@@ -313,6 +369,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             const materials = Array.isArray(node.material) ? node.material : node.material ? [node.material] : [];
             for (const m of materials) m.dispose();
         });
+        renderer.forceContextLoss();
         renderer.dispose();
         renderer.domElement.remove();
     }
