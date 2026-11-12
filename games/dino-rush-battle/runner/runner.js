@@ -7,6 +7,7 @@ import {createRunnerWave} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
 import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
+import {createRunnerNotice} from './notices.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -114,11 +115,13 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const bullets = [];
     const particles = [];
     const hitSound = createHitSound();
+    const notices = createRunnerNotice();
     const collected = [];
     const followers = [];
     const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
     function collectDinosaur(species) {
         collected.push(species);
+        notices.show(DINOSAURS[species].name + ' befreit!');
         if (followers.length >= 15) return;
         const follower = dinosaur(species, DINOSAURS[species].color);
         follower.scale.setScalar(0.42);
@@ -329,7 +332,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
     }
     function collectGate(obj) {
+        const previous = temporary[obj.modifier];
         Object.assign(temporary, applyGate(temporary, obj));
+        const current = temporary[obj.modifier];
+        notices.show(gateLabel(obj) + ': ' + previous.toFixed(2) + ' → ' + current.toFixed(2));
         burst(obj.x, 2.3, player.position.z, 'upgrade');
         hitSound.hit('upgrade');
     }
@@ -379,6 +385,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         previous = time;
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
+        notices.tick(dt);
         if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 8;
         if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 8;
         targetX = clamp(targetX, -5.15, 5.15);
@@ -471,7 +478,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
         reportTimer -= dt;
         if (reportTimer <= 0) {
-            onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary});
+            onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
