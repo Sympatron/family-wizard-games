@@ -99,3 +99,7 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stage.formation #hud.dino-stats-panel {padding:3px;}
   .dino-stat-card {gap:3px 6px;}
 }
+
+#sound-toggle {font-size:.75rem;font-weight:700;padding:6px 9px;border:1px solid #638b91;border-radius:9px;background:#294956;color:#ebf6e9;cursor:pointer;}
+#sound-toggle[aria-pressed="false"] {background:#26353d;color:#9db7b8;}
+#sound-toggle:focus-visible {outline:2px solid #f0ca7c;outline-offset:2px;}

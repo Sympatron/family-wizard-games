@@ -3,6 +3,7 @@ import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
 import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
+import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
 import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
@@ -16,6 +17,18 @@ const actions = document.querySelector('#actions');
 const stats = document.querySelector('#stats');
 const message = document.querySelector('#message');
 const help = document.querySelector('#help');
+const soundToggle = document.querySelector('#sound-toggle');
+function renderSoundToggle() {
+    const enabled = isHitSoundEnabled();
+    soundToggle.textContent = enabled ? 'Ton: An' : 'Ton: Aus';
+    soundToggle.setAttribute('aria-pressed', String(enabled));
+    soundToggle.setAttribute('aria-label', enabled ? 'Ton ausschalten' : 'Ton einschalten');
+}
+soundToggle.addEventListener('click', () => {
+    setHitSoundEnabled(!isHitSoundEnabled());
+    renderSoundToggle();
+});
+renderSoundToggle();
 let activePhase = null;
 let activeView = null;
 let state = null;

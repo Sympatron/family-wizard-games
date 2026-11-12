@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createHitSound} from '../games/dino-rush-battle/core/hit-sound.js';
+import {createHitSound, isHitSoundEnabled, setHitSoundEnabled} from '../games/dino-rush-battle/core/hit-sound.js';
 
 test('audio feedback stays optional when Web Audio is unavailable', () => {
     const original = globalThis.AudioContext;
@@ -47,5 +47,18 @@ test('audio unlocks on interaction, plays throttled hit tones and disposes', () 
         assert.ok(calls.includes('close'));
     } finally {
         globalThis.AudioContext = original;
+    }
+});
+
+test('sound can be muted and unmuted using the shared preference', () => {
+    assert.equal(typeof isHitSoundEnabled, 'function');
+    const initial = isHitSoundEnabled();
+    try {
+        setHitSoundEnabled(false);
+        assert.equal(isHitSoundEnabled(), false);
+        setHitSoundEnabled(true);
+        assert.equal(isHitSoundEnabled(), true);
+    } finally {
+        setHitSoundEnabled(initial);
     }
 });
