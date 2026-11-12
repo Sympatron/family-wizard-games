@@ -34,6 +34,69 @@ function addButton(parent, label, callback, {disabled = false, selected: isSelec
     parent.append(button);
     return button;
 }
+function enableUnitDragging(button, id) {
+    button.draggable = true;
+    button.addEventListener('dragstart', event => {
+        if (activePhase !== 'formation') return event.preventDefault();
+        event.dataTransfer.setData('text/plain', id);
+        event.dataTransfer.effectAllowed = 'move';
+        selected = id;
+    });
+    button.addEventListener('pointerdown', event => {
+        if (!['touch', 'pen'].includes(event.pointerType) || activePhase !== 'formation') return;
+        const {pointerId, clientX: startX, clientY: startY} = event;
+        let dragging = false;
+        let ghost = null;
+        function move(next) {
+            if (next.pointerId !== pointerId) return;
+            if (!dragging && Math.hypot(next.clientX - startX, next.clientY - startY) < 12) return;
+            if (!dragging) {
+                dragging = true;
+                selected = id;
+                ghost = document.createElement('div');
+                ghost.className = 'dino-drag-ghost';
+                ghost.textContent = button.textContent;
+                document.body.append(ghost);
+            }
+            next.preventDefault();
+            ghost.style.left = next.clientX + 'px';
+            ghost.style.top = next.clientY + 'px';
+            activeView?.highlightClient(next.clientX, next.clientY);
+        }
+        function cleanup(next, cancelled) {
+            if (next.pointerId !== pointerId) return;
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', cancel);
+            ghost?.remove();
+            const cell = !cancelled && dragging ? activeView?.clientCell(next.clientX, next.clientY) : null;
+            activeView?.showDropCell(null);
+            if (cell !== null && cell !== undefined && activePhase === 'formation') void execute('place', {id, cell});
+        }
+        function up(next) { cleanup(next, false); }
+        function cancel(next) { cleanup(next, true); }
+        window.addEventListener('pointermove', move, {passive: false});
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', cancel);
+    });
+}
+host.addEventListener('dragover', event => {
+    if (activePhase !== 'formation') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    activeView?.highlightClient(event.clientX, event.clientY);
+});
+host.addEventListener('dragleave', event => {
+    if (!host.contains(event.relatedTarget)) activeView?.showDropCell(null);
+});
+host.addEventListener('drop', event => {
+    if (activePhase !== 'formation') return;
+    event.preventDefault();
+    const id = event.dataTransfer.getData('text/plain');
+    const cell = activeView?.clientCell(event.clientX, event.clientY);
+    activeView?.showDropCell(null);
+    if (id && cell !== null && cell !== undefined) void execute('place', {id, cell});
+});
 function paragraph(parent, text) {
     const element = document.createElement('div');
     element.textContent = text;
@@ -69,17 +132,18 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades);
     heading.textContent = 'Dino-Team aufstellen';
     hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
-    help.textContent = 'Wähle einen Dino oder ziehe ihn auf ein Feld. Tanks nach vorn, Fernkämpfer nach hinten!';
+    help.textContent = 'Ziehe Dinos auf die Felder, auch aus dem Vorrat. Alternativ Dino wählen und Feld antippen.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
     for (const unit of all) {
         const species = SPECIES[unit.species];
         const text = species.name + ' L' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
-        addButton(picker, text, () => {
+        const button = addButton(picker, text, () => {
             selected = unit.id;
             formation();
         }, {selected: unit.id === selected});
+        enableUnitDragging(button, unit.id);
     }
     actions.append(picker);
     const row = document.createElement('div');
