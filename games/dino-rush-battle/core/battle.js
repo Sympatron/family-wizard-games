@@ -2,11 +2,16 @@ import {SPECIES, maxHp} from './game.js';
 
 const TICK = 0.1;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-const snapshot = units => units.map(u => ({id: u.id, team: u.team, species: u.species, x: u.x, y: u.y, hp: Math.max(0, u.hp), maxHp: u.maxHp, stunned: u.stunned > 0}));
+const snapshot = (units, shots = []) => {
+    const frame = units.map(u => ({id: u.id, team: u.team, species: u.species, x: u.x, y: u.y, hp: Math.max(0, u.hp), maxHp: u.maxHp, stunned: u.stunned > 0}));
+    frame.shots = shots;
+    return frame;
+};
 
 export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}) {
     const units = [...army.map(unit => makeUnit(unit, 'player', upgrades, battleUpgrades)), ...enemies.map(unit => makeUnit(unit, 'enemy'))];
     const frames = [snapshot(units)];
+    let shots = [];
     let winner = null;
     for (let step = 0; step < 600; step++) {
         for (const unit of units) {
@@ -26,6 +31,9 @@ export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}
             } else if (unit.cooldown <= 0) {
                 unit.cooldown = unit.attackTime;
                 unit.attacks++;
+                if (SPECIES[unit.species].role === 'Fernkampf') {
+                    shots.push({team: unit.team, species: unit.species, x: unit.x, y: unit.y, tx: target.x, ty: target.y});
+                }
                 target.hp = Math.max(0, target.hp - unit.damage);
                 if (unit.species === 'triceratops' && unit.attacks % 3 === 0) target.stunned = Math.max(target.stunned, 0.65);
                 if (['troodon', 'stegosaurus'].includes(unit.species) && unit.attacks % 3 === 0) {
@@ -35,12 +43,16 @@ export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}
                 }
             }
         }
-        if (step % 2 === 0) frames.push(snapshot(units));
+        if (step % 2 === 0) {
+            frames.push(snapshot(units, shots));
+            shots = [];
+        }
         const alivePlayer = units.some(u => u.team === 'player' && u.hp > 0);
         const aliveEnemy = units.some(u => u.team === 'enemy' && u.hp > 0);
         if (!alivePlayer || !aliveEnemy) {
             winner = alivePlayer ? 'player' : 'enemy';
-            frames.push(snapshot(units));
+            frames.push(snapshot(units, shots));
+            shots = [];
             break;
         }
     }
@@ -54,7 +66,7 @@ function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
     const unitMax = team === 'player' ? maxHp(unit, upgrades) : Math.max(1, unit.hp);
     return {
         id: unit.id, team, species: unit.species,
-        x: team === 'player' ? 380 - depth * 66 : 580 + depth * 66,
+        x: team === 'player' ? 315 - depth * 50 : 645 + depth * 50,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
         speed: species.speed, range: species.range, damage: Math.round(species.damage * (1 + (unit.level - 1) * 0.2) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
