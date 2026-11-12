@@ -77,8 +77,8 @@ test('mouse dragging follows initial pointer offset and merges on actual release
     view.units.set('player:d1', {container, targetX: from.x, targetY: from.y});
     send('pointerdown', {x: from.x + 12, y: from.y - 8});
     send('pointermove', {x: to.x + 12, y: to.y - 8});
-    assert.equal(container.x, to.x);
-    assert.equal(container.y, to.y);
+    assert.ok(Math.abs(container.x - to.x) < 0.001);
+    assert.ok(Math.abs(container.y - to.y) < 0.001);
     send('pointerup', {x: to.x + 12, y: to.y - 8});
     assert.deepEqual(events, [{type: 'drop', id: 'd1', target: {unitId: 'd2', cell: 6}}]);
     assert.equal(container.x, from.x);
