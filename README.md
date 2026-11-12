@@ -24,7 +24,9 @@ The first command assembles `dist/`; the second runs optional local Node tests. 
 - `main` publishes the stable launcher and games to `https://sympatron.github.io/family-wizard-games/`.
 - `dev` publishes the development snapshot to `https://sympatron.github.io/family-wizard-games/preview/`.
 - A push to either branch rebuilds and deploys **both** snapshots in one GitHub Pages site. Before `dev` exists, preview temporarily mirrors `main`.
-- A pull request only runs the lightweight static build; no tests, linting, Docker or Python are run by CI.
+- Every open same-repository pull request gets an isolated preview at `https://sympatron.github.io/family-wizard-games/preview/pr-<number>/`. It refreshes after each PR commit (via the build-check workflow) **without merging**. Closing the PR removes its preview on the next deployment. PRs from forks receive build checks but are not hosted.
+- Each GitHub Pages deployment rebuilds stable, dev and all open same-repository PR snapshots together. GitHub Pages hosts one artifact, so publishing just one PR in isolation would otherwise erase the others.
+- Pull requests run only the lightweight static build check; no tests, linting, Docker or Python are run by CI.
 - Each deployment contains a `version.json` with the source branch commit SHA. Open pages check for changes every eight seconds and reload without discarding mock local storage.
 
 Enable **Settings → Pages → Build and deployment → GitHub Actions** in GitHub once. The website can remain public even when the repository is private. GitHub Pages publishing from private repositories requires an eligible GitHub plan; GitHub Free requires a public repository. Never commit secrets, production data, or private family content.
@@ -72,7 +74,7 @@ The `id` is a unique request ID. Repeating an operation must return the original
 
 `mountDevtools(backend)` adds an on-page panel in mock mode for switching users, changing the coin balance, setting network delay, failing the next action, editing any game state as JSON and importing/exporting scenarios. Use the panel to reach hard-to-test states without replaying the game. Mock data remains on the current browser/device and never reaches Family Wizard. A reset affects the selected user's current game and mock wallet. The browser's origin separates stable from preview storage automatically because they share an origin **only if distinct storage key prefixes are used**; see the note below.
 
-**Stable/preview storage isolation:** Both sites share a GitHub Pages origin, so the mock backend includes `stable` or `preview` in its storage key prefix. They retain independent game states, wallets and user selections in the same browser profile.
+**Stable/preview storage isolation:** All sites share a GitHub Pages origin, so the mock backend includes `stable`, `preview` or a unique `preview-pr-<number>` in its storage key prefix. They retain independent game states, wallets and user selections in the same browser profile.
 
 ### Real Wizard adapter (contract; backend endpoints not yet implemented)
 

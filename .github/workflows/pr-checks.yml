@@ -1,0 +1,24 @@
+name: Games PR checks
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger preview cleanup after PR closure
+        if: github.event.action == 'closed'
+        run: echo "The Pages workflow will remove closed PR previews."
+      - uses: actions/checkout@v4
+        if: github.event.action != 'closed'
+      - uses: actions/setup-node@v4
+        if: github.event.action != 'closed'
+        with:
+          node-version: '24'
+      - run: npm run build
+        if: github.event.action != 'closed'

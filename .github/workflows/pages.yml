@@ -1,31 +1,22 @@
 name: Games Pages
 
 on:
-  pull_request:
   push:
     branches: [main, dev]
   workflow_dispatch:
+  workflow_run:
+    workflows: [Games PR checks]
+    types: [completed]
 
 permissions:
   contents: read
 
 concurrency:
-  group: games-pages-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'publish' }}
-  cancel-in-progress: true
+  group: games-pages-publish
+  cancel-in-progress: false
 
 jobs:
-  build:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - run: npm run build
-
   deploy:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,7 +54,27 @@ jobs:
           else
             exit "$status"
           fi
-          node preview/scripts/build.mjs --source preview --out site/preview --revision "$revision"
+          node stable/scripts/build.mjs --source preview --out site/preview --revision "$revision"
+      - name: Find open same-repository pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" --jq '.[] | select(.head.repo.full_name == .base.repo.full_name) | .number' > open-prs.txt
+      - name: Build isolated PR previews
+        shell: bash
+        run: |
+          while read -r number; do
+            [ -z "$number" ] && continue
+            mkdir -p pr-source
+            git -C stable fetch --depth=1 origin "refs/pull/$number/head"
+            revision="$(git -C stable rev-parse FETCH_HEAD)"
+            git -C stable archive FETCH_HEAD | tar -x -C pr-source
+            if ! node stable/scripts/build.mjs --source pr-source --out "site/preview/pr-$number" --revision "$revision"; then
+              echo "::warning::Skipping invalid preview for PR #$number"
+              rm -rf "site/preview/pr-$number"
+            fi
+            rm -rf pr-source
+          done < open-prs.txt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
