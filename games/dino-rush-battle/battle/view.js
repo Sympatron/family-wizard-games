@@ -33,10 +33,17 @@ export class BattleView {
             backgroundColor: '#132938',
             scale: {mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: size.width, height: size.height},
             scene: {
+                preload() { owner.preload(this); },
                 create() { owner.initialize(this); },
                 update(_time, delta) { owner.update(delta); }
             }
         });
+    }
+
+    preload(scene) {
+        for (const species of Object.keys(SPECIES)) {
+            scene.load.svg('dino-' + species, './assets/dinos/' + species + '.svg', {width: 160, height: 128});
+        }
     }
 
     initialize(scene) {
@@ -277,13 +284,12 @@ export class BattleView {
         const scene = this.scene;
         const container = scene.add.container(unit.x, unit.y).setDepth(1);
         const shadow = scene.add.ellipse(0, 18, 46, 18, 0x101c23, 0.5);
-        const circle = scene.add.circle(0, -3, 24, SPECIES[unit.species].color);
-        const shortName = scene.add.text(0, -8, SPECIES[unit.species].name.slice(0, 3).toUpperCase(),
-            {fontFamily: 'system-ui', fontSize: '12px', fontStyle: 'bold', color: '#101c23'}).setOrigin(0.5);
+        const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(67, 54);
+        const selection = scene.add.rectangle(0, -7, 65, 54, 0x15212b, 0).setStrokeStyle(1.5, 0x314c55);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, circle, shortName, healthBack, health]);
-        const result = {container, circle, health, targetX: unit.x, targetY: unit.y, team: unit.team};
+        container.add([shadow, sprite, selection, healthBack, health]);
+        const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
     }
@@ -313,9 +319,9 @@ export class BattleView {
             if (isFormation && this.drag?.id !== unit.id) entry.container.setPosition(unit.x, unit.y);
             entry.container.setVisible(unit.hp > 0 || isFormation);
             entry.container.setAlpha(unit.hp > 0 ? 1 : 0.4);
-            entry.circle.setFillStyle(unit.stunned ? 0xf0d37d : SPECIES[unit.species].color);
+            entry.sprite.setTint(unit.stunned ? 0xf0d37d : 0xffffff);
             const chosen = unit.id === this.selected && isFormation;
-            entry.circle.setStrokeStyle(chosen ? 4 : 1.5, chosen ? 0xffef8a : 0x15212b);
+            entry.selection.setStrokeStyle(chosen ? 4 : 1.5, chosen ? 0xffef8a : 0x314c55);
             entry.health.displayWidth = 48 * Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
         }
         for (const [key, entry] of this.units) {
