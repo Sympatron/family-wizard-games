@@ -2,6 +2,7 @@ import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
 import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
+import {resolveFormationDrop} from './core/drops.js';
 import {simulateBattle} from './core/battle.js';
 import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
@@ -23,6 +24,9 @@ let appliedRevision = -1;
 let appliedUser = null;
 let activeUser = null;
 let applying = false;
+const mergeDialog = document.createElement('dialog');
+mergeDialog.className = 'dino-merge-dialog';
+document.body.append(mergeDialog);
 
 function addButton(parent, label, callback, {disabled = false, selected: isSelected = false} = {}) {
     const button = document.createElement('button');
@@ -34,6 +38,96 @@ function addButton(parent, label, callback, {disabled = false, selected: isSelec
     parent.append(button);
     return button;
 }
+function chooseEvolution(ids, choices) {
+    if (activePhase !== 'formation' || !choices.length) return;
+    if (mergeDialog.open) mergeDialog.close();
+    mergeDialog.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = 'Dinosaurier fusionieren';
+    const description = document.createElement('p');
+    description.textContent = 'Wähle die Entwicklung für deine beiden gleichen Dinos:';
+    const buttons = document.createElement('div');
+    buttons.className = 'dino-merge-options';
+    for (const species of choices) {
+        addButton(buttons, SPECIES[species].name, () => {
+            mergeDialog.close();
+            void execute('merge', {ids, into: species});
+        });
+    }
+    addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    mergeDialog.append(title, description, buttons);
+    mergeDialog.showModal();
+}
+function dropDinosaur(id, target) {
+    if (activePhase !== 'formation') return;
+    const result = resolveFormationDrop(state?.game.run, id, target);
+    if (!result) return;
+    if (result.type === 'merge-choice') chooseEvolution(result.ids, result.choices);
+    else void execute(result.type, result.payload);
+}
+function enableUnitDragging(button, id) {
+    button.draggable = true;
+    button.addEventListener('dragstart', event => {
+        if (activePhase !== 'formation') return event.preventDefault();
+        event.dataTransfer.setData('text/plain', id);
+        event.dataTransfer.effectAllowed = 'move';
+        selected = id;
+    });
+    button.addEventListener('pointerdown', event => {
+        if (!['touch', 'pen'].includes(event.pointerType) || activePhase !== 'formation') return;
+        const {pointerId, clientX: startX, clientY: startY} = event;
+        let dragging = false;
+        let ghost = null;
+        function move(next) {
+            if (next.pointerId !== pointerId) return;
+            if (!dragging && Math.hypot(next.clientX - startX, next.clientY - startY) < 12) return;
+            if (!dragging) {
+                dragging = true;
+                selected = id;
+                ghost = document.createElement('div');
+                ghost.className = 'dino-drag-ghost';
+                ghost.textContent = button.textContent;
+                document.body.append(ghost);
+            }
+            next.preventDefault();
+            ghost.style.left = next.clientX + 'px';
+            ghost.style.top = next.clientY + 'px';
+            activeView?.highlightClient(next.clientX, next.clientY, id);
+        }
+        function cleanup(next, cancelled) {
+            if (next.pointerId !== pointerId) return;
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+            window.removeEventListener('pointercancel', cancel);
+            ghost?.remove();
+            const target = !cancelled && dragging ? activeView?.targetAtClient(next.clientX, next.clientY, id) : null;
+            activeView?.showDropTarget(null);
+            if (target && activePhase === 'formation') dropDinosaur(id, target);
+        }
+        function up(next) { cleanup(next, false); }
+        function cancel(next) { cleanup(next, true); }
+        window.addEventListener('pointermove', move, {passive: false});
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', cancel);
+    });
+}
+host.addEventListener('dragover', event => {
+    if (activePhase !== 'formation') return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    activeView?.highlightClient(event.clientX, event.clientY);
+});
+host.addEventListener('dragleave', event => {
+    if (!host.contains(event.relatedTarget)) activeView?.showDropTarget(null);
+});
+host.addEventListener('drop', event => {
+    if (activePhase !== 'formation') return;
+    event.preventDefault();
+    const id = event.dataTransfer.getData('text/plain');
+    const target = activeView?.targetAtClient(event.clientX, event.clientY, id);
+    activeView?.showDropTarget(null);
+    if (id && target) dropDinosaur(id, target);
+});
 function paragraph(parent, text) {
     const element = document.createElement('div');
     element.textContent = text;
@@ -57,29 +151,74 @@ async function refresh() {
     catch (error) { message.textContent = error.message; }
 }
 function cleanup() {
+    if (mergeDialog.open) mergeDialog.close();
     activeView?.destroy();
     activeView = null;
     host.replaceChildren();
+}
+function renderFormationStats(unit, run) {
+    hud.replaceChildren();
+    if (!unit) {
+        hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
+        return;
+    }
+    const type = SPECIES[unit.species];
+    const maximum = maxHp(unit, state.game.meta.upgrades);
+    const damage = Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15));
+    const make = (tag, className, content) => {
+        const element = document.createElement(tag);
+        element.className = className;
+        if (content !== undefined) element.textContent = content;
+        return element;
+    };
+    const card = make('div', 'dino-stat-card');
+    card.style.setProperty('--dino-color', '#' + type.color.toString(16).padStart(6, '0'));
+    const header = make('div', 'dino-stat-header');
+    const avatar = make('img', 'dino-stat-avatar');
+    avatar.src = './assets/dinos/' + unit.species + '.svg';
+    avatar.alt = type.name;
+    avatar.width = 56;
+    avatar.height = 46;
+    const identity = make('div', 'dino-stat-identity');
+    identity.append(make('strong', '', type.name), make('small', '', 'Level ' + unit.level + ' · ' + type.role));
+    header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
+    const health = make('div', 'dino-stat-health');
+    health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
+    const meter = make('progress', 'dino-stat-meter');
+    meter.max = maximum;
+    meter.value = unit.hp;
+    meter.setAttribute('aria-label', 'Lebenspunkte');
+    const grid = make('div', 'dino-stat-grid');
+    for (const [label, value] of [
+        ['Schaden', damage], ['Reichweite', type.range], ['Tempo', type.speed], ['Angriff', type.cooldown + ' s']
+    ]) {
+        const stat = make('div', 'dino-stat-value');
+        stat.append(make('small', '', label), make('strong', '', String(value)));
+        grid.append(stat);
+    }
+    card.append(header, health, meter, grid);
+    hud.append(card);
 }
 function formation() {
     const run = state.game.run;
     const enemies = getEnemies(run.stage);
     const all = [...run.army, ...run.inventory];
     if (!all.some(unit => unit.id === selected)) selected = all[0]?.id ?? null;
-    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades);
+    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
-    hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
-    help.textContent = 'Wähle einen Dino oder ziehe ihn auf ein Feld. Tanks nach vorn, Fernkämpfer nach hinten!';
+    renderFormationStats(all.find(item => item.id === selected), run);
+    help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
     for (const unit of all) {
         const species = SPECIES[unit.species];
         const text = species.name + ' L' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
-        addButton(picker, text, () => {
+        const button = addButton(picker, text, () => {
             selected = unit.id;
             formation();
         }, {selected: unit.id === selected});
+        enableUnitDragging(button, unit.id);
     }
     actions.append(picker);
     const row = document.createElement('div');
@@ -91,9 +230,7 @@ function formation() {
     }
     const merge = mergeOptions(all);
     for (const option of merge) {
-        for (const into of option.choices) {
-            addButton(row, SPECIES[option.species].name + ' → ' + SPECIES[into].name, () => void execute('merge', {ids: option.ids, into}));
-        }
+        addButton(row, SPECIES[option.species].name + ' fusionieren', () => chooseEvolution(option.ids, option.choices));
     }
     actions.append(row);
 }
@@ -169,6 +306,7 @@ function apply(snapshot) {
         const previousUser = activeUser;
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
+        hud.classList.toggle('dino-stats-panel', phase === 'formation');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
@@ -177,9 +315,9 @@ function apply(snapshot) {
             if (phase === 'runner') beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
-                    onCell: cell => { if (selected) void execute('place', {id: selected, cell}); },
+                    onCell: cell => { if (selected) dropDinosaur(selected, cell); },
                     onSelect: id => { selected = id; formation(); },
-                    onDrop: (id, cell) => { selected = id; void execute('place', {id, cell}); }
+                    onDrop: (id, cell) => { selected = id; dropDinosaur(id, cell); }
                 });
                 if (phase === 'formation') formation();
                 else beginBattle();

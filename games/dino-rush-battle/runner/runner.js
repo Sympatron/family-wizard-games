@@ -1,20 +1,23 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
 import {SPECIES as DINOSAURS} from '../core/game.js';
+import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
+import {createRanger} from './ranger.js';
+import {runnerCameraSettings} from './camera.js';
+import {createRunnerWave} from './spawns.js';
+import {bulletHitsCage} from './collision.js';
+import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
+import {createHitSound} from '../core/hit-sound.js';
 
 const DURATION = 35;
-const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
-const GATE_KINDS = ['damage', 'fireRate', 'bullets'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
-    scene.fog = new THREE.Fog(0x142734, 50, 150);
-    const camera = new THREE.PerspectiveCamera(66, 1, 0.1, 250);
-    camera.position.set(0, 8, 23);
-    camera.lookAt(0, 7.5, -17);
+    scene.fog = new THREE.Fog(0x142734, 85, 260);
+    const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 340);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer:coarse)').matches ? 1.5 : 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     host.replaceChildren(renderer.domElement);
     scene.add(new THREE.HemisphereLight(0xd6f7ff, 0x354b39, 2.2));
@@ -77,17 +80,52 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         result.userData.skin = skin;
         return result;
     }
-    box(8.7, 0.2, 230, 0x395a46, 0, -0.18, -49);
-    box(0.25, 1, 230, 0x86b177, -4.5, 0.3, -49);
-    box(0.25, 1, 230, 0x86b177, 4.5, 0.3, -49);
-    const markings = Array.from({length: 16}, (_, i) => box(0.12, 0.015, 4.2, 0xb5d4a1, 0, 0.01, 12 - i * 9));
-    const player = dinosaur('raptor', 0xf5c768);
+    box(13, 0.2, 540, 0x395a46, 0, -0.18, -240);
+    box(0.3, 0.8, 540, 0x86b177, -6.65, 0.3, -240);
+    box(0.3, 0.8, 540, 0x86b177, 6.65, 0.3, -240);
+    const markings = Array.from({length: 40}, (_, i) => box(0.18, 0.02, 3.8, 0xb5d4a1, 0, 0.01, 12 - i * 8));
+    const scenery = [];
+    for (let i = 0; i < 84; i++) {
+        const decoration = new THREE.Group();
+        const side = i % 2 ? 1 : -1;
+        const x = side * (8.4 + (i % 4) * 2.2);
+        const z = 16 - Math.floor(i / 2) * 7;
+        if (i % 5 === 0) {
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2 + i % 3 * 0.3), material(0x7f9991));
+            rock.scale.y = 0.6;
+            rock.position.y = 0.6;
+            decoration.add(rock);
+        } else {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 2.6, 6), material(0x806044));
+            trunk.position.y = 1.3;
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.3 + i % 3 * 0.18, 3.8, 7), material(i % 3 ? 0x3e865d : 0x569a68));
+            leaves.position.y = 4.2;
+            decoration.add(trunk, leaves);
+        }
+        decoration.position.set(x, 0, z);
+        scene.add(decoration);
+        scenery.push(decoration);
+    }
+    const player = createRanger(THREE);
     scene.add(player);
     player.position.set(0, 0, 8);
 
     const objects = [];
     const bullets = [];
+    const particles = [];
+    const hitSound = createHitSound();
     const collected = [];
+    const followers = [];
+    const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
+    function collectDinosaur(species) {
+        collected.push(species);
+        if (followers.length >= 15) return;
+        const follower = dinosaur(species, DINOSAURS[species].color);
+        follower.scale.setScalar(0.42);
+        follower.position.set(player.position.x, 0, 9.4);
+        scene.add(follower);
+        followers.push(follower);
+    }
     const temporary = {damage: 1 + (upgrades.runnerDamage ?? 0) * 0.12, fireRate: 1, bullets: 1};
     let remaining = DURATION;
     let elapsed = 0;
@@ -95,8 +133,9 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let shots = 0;
     let kills = 0;
     let spawnCount = 0;
-    let nextSpawn = 1;
-    let nextGate = 8;
+    let nextSpawn = 0.5;
+    let nextGate = 4.2;
+    let gateCount = 0;
     let shotTimer = 0;
     let reportTimer = 0;
     let targetX = 0;
@@ -106,77 +145,151 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let previous = performance.now();
     const keys = new Set();
     let hurtFlash = 0;
+    let finishHold = null;
 
-    function label(text, color = '#f4f8dd') {
+    function gateText(text, y, width, height, fontSize, color) {
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 96;
+        canvas.width = 1024;
+        canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, 256, 96);
-        ctx.fillStyle = '#142734cf';
-        ctx.fillRect(0, 9, 256, 78);
-        ctx.strokeStyle = '#99c4a5';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(2, 11, 252, 74);
-        ctx.fillStyle = color;
-        ctx.font = 'bold 33px system-ui';
+        ctx.font = '900 ' + fontSize + 'px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(text, 128, 61);
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 13;
+        ctx.strokeStyle = '#17252b';
+        ctx.strokeText(text, 512, 136, 970);
+        ctx.fillStyle = color;
+        ctx.fillText(text, 512, 136, 970);
         const texture = new THREE.CanvasTexture(canvas);
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
-        sprite.scale.set(3.3, 1.3, 1);
-        sprite.position.y = 4.2;
+        sprite.scale.set(width, height, 1);
+        sprite.position.set(0, y, 0.35);
         return sprite;
     }
-    function gateText(obj) {
-        const name = obj.modifier === 'damage' ? 'SCHADEN' : obj.modifier === 'fireRate' ? 'TEMPO' : 'KUGELN';
-        return name + ' ' + (obj.level > 0 ? '+' : '') + obj.level;
-    }
     function updateGate(obj) {
-        obj.mesh.material.color.setHex(obj.level > 0 ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xc0b66b);
-        const old = obj.label;
-        if (old) {
-            obj.group.remove(old);
-            old.material.map.dispose();
-            old.material.dispose();
+        const positive = obj.level > 0;
+        const color = positive ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xd5c774;
+        obj.mesh.material.color.setHex(color);
+        obj.header.material.color.setHex(positive ? 0x256d68 : obj.level < 0 ? 0x873c35 : 0x777044);
+        if (obj.label) {
+            obj.group.remove(obj.label);
+            obj.label.traverse(node => {
+                node.material?.map?.dispose();
+                node.material?.dispose();
+            });
         }
-        obj.label = label(gateText(obj));
-        obj.group.add(obj.label);
+        const [type, value] = gateLabel(obj).split(' ');
+        const label = new THREE.Group();
+        label.add(gateText(type, 4.55, 5.8, 0.8, 126, '#ffffff'));
+        label.add(gateText(value, 2.15, 5.75, 2.55, 210, '#fff3a0'));
+        obj.label = label;
+        obj.group.add(label);
     }
-    function spawnGatePair() {
-        const modifier = GATE_KINDS[Math.floor(stage + elapsed / 18) % GATE_KINDS.length];
-        for (const [x, level] of [[-2.15, -2], [2.15, 1]]) {
+    function spawnGatePair(goalZ) {
+        if (!canSpawnBeforeGoal(-80, goalZ, 6)) return;
+        const pairId = gateCount++;
+        for (const [index, definition] of createGatePair(stage, pairId).entries()) {
+            const x = index === 0 ? -3.2 : 3.2;
             const group = new THREE.Group();
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.6, 0.35), material(0xcccccc));
-            mesh.position.y = 1.85;
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6.1, 4.1), new THREE.MeshBasicMaterial({
+                color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide
+            }));
+            mesh.position.y = 2.05;
             group.add(mesh);
-            group.position.set(x, 0, -95);
+            const header = new THREE.Mesh(new THREE.BoxGeometry(6.12, 0.95, 0.42), material(0x647d79));
+            header.position.y = 4.55;
+            group.add(header);
+            for (const side of [-1, 1]) {
+                const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 4.1, 0.2), material(0xaac7bf));
+                post.position.set(side * 3.03, 2.05, 0.04);
+                group.add(post);
+            }
+            group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {kind: 'gate', x, z: -95, level, modifier, charge: 0, mesh, group, label: null, resolved: false};
+            const obj = {...definition, kind: 'gate', pairId, x, z: -80, charge: 0, mesh, header, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
     }
-    function spawnEnemyOrCage() {
-        const isCage = spawnCount % 3 !== 1;
-        const x = [-2.6, 0, 2.6][(spawnCount + stage) % 3];
+    function cage(species) {
         const group = new THREE.Group();
-        const species = SPECIES[(spawnCount + Math.floor(stage / 2)) % SPECIES.length];
-        const creature = dinosaur(species, isCage ? DINOSAURS[species].color : 0xda7766);
-        creature.scale.setScalar(isCage ? 0.68 : 0.9);
+        const frame = material(0x6a5843);
+        const iron = new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35});
+        const lock = new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3});
+        function bar(width, height, depth, x, y, z, mat = iron) {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+            return mesh;
+        }
+        const creature = dinosaur(species, DINOSAURS[species].color);
+        creature.scale.setScalar(0.68);
         creature.rotation.y = Math.PI;
         group.add(creature);
-        if (isCage) {
-            const cage = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.75, 2.75), material(0xf0d28c));
-            cage.position.y = 1.2;
-            cage.material.wireframe = true;
-            group.add(cage);
+        bar(2.85, 0.3, 2.85, 0, 0.1, 0, frame);
+        bar(2.85, 0.26, 2.85, 0, 3.05, 0, frame);
+        for (const x of [-1.36, 1.36]) {
+            for (const z of [-1.36, 1.36]) bar(0.18, 3.05, 0.18, x, 1.6, z, frame);
         }
-        group.position.set(x, 0, -100);
-        scene.add(group);
-        objects.push({kind: isCage ? 'cage' : 'enemy', x, z: -100, hp: isCage ? 3 : 2 + Math.floor(stage / 3), species, group});
-        spawnCount++;
+        for (const z of [-1.36, 1.36]) {
+            for (const x of [-1.01, -0.67, -0.33, 0, 0.33, 0.67, 1.01]) bar(0.065, 2.8, 0.08, x, 1.59, z);
+            bar(2.8, 0.09, 0.09, 0, 1.58, z);
+        }
+        for (const x of [-1.36, 1.36]) {
+            for (const z of [-0.82, -0.27, 0.27, 0.82]) bar(0.08, 2.8, 0.065, x, 1.59, z);
+        }
+        for (const x of [-0.72, 0, 0.72]) bar(0.08, 0.075, 2.85, x, 3.2, 0);
+        bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
+        const background = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.37, 0.1),
+            new THREE.MeshBasicMaterial({color: 0x14252c, depthTest: false}));
+        background.position.set(0, 3.72, 1.38);
+        background.renderOrder = 4;
+        const healthFill = new THREE.Mesh(new THREE.BoxGeometry(2.45, 0.22, 0.13),
+            new THREE.MeshBasicMaterial({color: 0x65e59b, depthTest: false}));
+        healthFill.position.set(0, 3.72, 1.47);
+        healthFill.renderOrder = 5;
+        group.add(background, healthFill);
+        group.userData.healthFill = healthFill;
+        return group;
     }
+    function spawnWave(goalZ) {
+        for (const item of createRunnerWave(spawnCount++, stage)) {
+            if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
+            const group = cage(item.species);
+            group.position.set(item.x, 0, item.z);
+            scene.add(group);
+            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, hp: 2, hitFlash: 0, group});
+        }
+    }
+    function createFinishGoal() {
+        const group = new THREE.Group();
+        const gold = material(0xf1cb76);
+        const dark = material(0x263a40);
+        const post = (width, height, depth, x, y, z, mat = gold) => {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+            return mesh;
+        };
+        for (const x of [-6.3, 6.3]) {
+            post(0.5, 5.9, 0.6, x, 2.95, 0);
+            post(0.72, 0.72, 0.72, x, 5.7, 0, dark);
+        }
+        post(13, 0.6, 0.65, 0, 5.85, 0);
+        const sign = gateText('ZIEL', 5.85, 6, 1.4, 190, '#ffffff');
+        sign.position.z = 0.5;
+        group.add(sign);
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(12.5, 0.045, 0.9), material(0xffffff));
+        stripe.position.set(0, 0.015, 0);
+        group.add(stripe);
+        const mark = material(0x182c35);
+        for (let i = 0; i < 10; i++) {
+            post(1.25, 0.05, 0.9, -5.625 + i * 1.25, 0.045, 0, i % 2 ? gold : mark);
+        }
+        scene.add(group);
+        return group;
+    }
+    const finishGoal = createFinishGoal();
     function disposeGroup(group) {
         scene.remove(group);
         group.traverse(node => {
@@ -195,39 +308,58 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         disposeGroup(obj.group);
     }
     function shoot() {
-        const count = Math.min(5, temporary.bullets);
+        const count = Math.min(7, temporary.bullets);
         for (let i = 0; i < count; i++) {
             const x = player.position.x + (i - (count - 1) / 2) * 0.4;
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), material(0xffef9c));
-            mesh.position.set(x, 1.35, 6);
+            mesh.position.set(x, 1.5, 6);
             scene.add(mesh);
             bullets.push({mesh, x, z: 6});
         }
         shots++;
     }
-    function applyGate(obj) {
-        if (obj.level < 0) {
-            if (obj.modifier === 'bullets') temporary.bullets = Math.max(1, temporary.bullets + obj.level);
-            else temporary[obj.modifier] = Math.max(0.35, temporary[obj.modifier] + obj.level * 0.3);
-        } else if (obj.modifier === 'bullets') temporary.bullets = Math.min(5, temporary.bullets + obj.level);
-        else temporary[obj.modifier] = Math.min(5, temporary[obj.modifier] + obj.level * 0.35);
+    function burst(x, y, z, kind = 'impact') {
+        const color = kind === 'break' ? 0x7ee6ac : kind === 'upgrade' ? 0x70cfff : 0xffd389;
+        for (let i = 0; i < (kind === 'break' ? 12 : 7); i++) {
+            const mesh = new THREE.Mesh(new THREE.TetrahedronGeometry(0.07 + Math.random() * 0.09),
+                new THREE.MeshBasicMaterial({color, transparent: true, opacity: 1, depthWrite: false}));
+            mesh.position.set(x + (Math.random() - 0.5) * 0.7, y + Math.random() * 0.5, z);
+            scene.add(mesh);
+            particles.push({mesh, life: 0.35, vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4, vz: (Math.random() - 0.5) * 6});
+        }
+    }
+    function collectGate(obj) {
+        Object.assign(temporary, applyGate(temporary, obj));
+        burst(obj.x, 2.3, player.position.z, 'upgrade');
+        hitSound.hit('upgrade');
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
-            if (obj.resolved || Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 1.35 : 1.1)) continue;
-            if (obj.z < bullet.z - 1.25 || obj.z > previousZ + 1.25) continue;
+            const hit = obj.kind === 'gate'
+                ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
+                : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
+            if (!hit) continue;
+            burst(bullet.x, obj.kind === 'gate' ? 2 : 2.5, obj.z, 'impact');
+            hitSound.hit('impact');
             if (obj.kind === 'gate') {
                 obj.charge++;
-                if (obj.charge >= 3) {
+                if (obj.charge >= 2) {
                     obj.charge = 0;
-                    obj.level = Math.min(3, obj.level + 1);
+                    Object.assign(obj, improveGate(obj));
                     updateGate(obj);
                 }
             } else {
                 obj.hp -= temporary.damage;
+                obj.hitFlash = 0.18;
+                const fraction = Math.max(0, obj.hp / 2);
+                const fill = obj.group.userData.healthFill;
+                fill.scale.x = Math.max(0.001, fraction);
+                fill.position.x = -2.45 * (1 - fraction) / 2;
+                fill.material.color.setHex(fraction > 0.5 ? 0x65e59b : 0xffc16b);
                 if (obj.hp <= 0) {
-                    if (obj.kind === 'cage') collected.push(obj.species);
-                    else kills++;
+                    burst(obj.x, 2.1, obj.z, 'break');
+                    hitSound.hit('break');
+                    collectDinosaur(obj.species);
                     removeObject(obj);
                 }
             }
@@ -247,50 +379,67 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         previous = time;
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
-        if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 6.2;
-        if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 6.2;
-        targetX = clamp(targetX, -3.4, 3.4);
+        if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 8;
+        if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 8;
+        targetX = clamp(targetX, -5.15, 5.15);
         player.position.x = THREE.MathUtils.damp(player.position.x, targetX, 14, dt);
         player.rotation.z = (player.position.x - targetX) * 0.07;
         player.position.y = Math.sin(elapsed * 13) * 0.05;
         for (const [index, leg] of player.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 13 + index * Math.PI) * 0.25;
+        for (const [index, follower] of followers.entries()) {
+            const row = Math.floor(index / followerOffsets.length);
+            const x = clamp(player.position.x + followerOffsets[index % followerOffsets.length], -5.5, 5.5);
+            follower.position.x = THREE.MathUtils.damp(follower.position.x, x, 4 / (1 + row * 0.3), dt);
+            follower.position.z = player.position.z + 1.4 + row * 1.15;
+            follower.position.y = Math.sin(elapsed * 7 + index) * 0.04;
+            for (const [legIndex, leg] of follower.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 7 + legIndex * Math.PI + index) * 0.18;
+        }
         hurtFlash = Math.max(0, hurtFlash - dt);
-        player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0xf5c768);
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.3, 2.5, dt);
+        player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0x47644b);
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.25, 2.5, dt);
+        camera.lookAt(camera.position.x * 0.4, 1.5, -20);
         shotTimer -= dt;
         if (shotTimer <= 0) {
             shoot();
             shotTimer += 0.28 / temporary.fireRate;
         }
-        if (elapsed >= nextSpawn) {
-            spawnEnemyOrCage();
-            nextSpawn += 3.1;
+        const speed = 17 + stage * 0.6;
+        finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
+        if (remaining > 0 && elapsed >= nextSpawn) {
+            spawnWave(finishGoal.position.z);
+            nextSpawn += 1.65;
         }
-        if (elapsed >= nextGate) {
-            spawnGatePair();
-            nextGate += 14;
+        if (remaining > 0 && elapsed >= nextGate) {
+            spawnGatePair(finishGoal.position.z);
+            nextGate += 9.8;
         }
-        const speed = 12.5 + stage * 0.4;
         for (const marking of markings) {
             marking.position.z += speed * dt;
-            if (marking.position.z > 18) marking.position.z -= 144;
+            if (marking.position.z > 20) marking.position.z -= 320;
+            marking.visible = marking.position.z >= finishGoal.position.z + 1;
+        }
+        for (const decoration of scenery) {
+            decoration.position.z += speed * dt;
+            if (decoration.position.z > 22) decoration.position.z -= 294;
+            decoration.visible = decoration.position.z >= finishGoal.position.z + 1;
         }
         for (const obj of [...objects]) {
             if (!objects.includes(obj)) continue;
+            const previousZ = obj.z;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
-            if (obj.z > 8) {
-                if (obj.kind === 'gate') {
-                    if (Math.abs(player.position.x - obj.x) < 1.25) applyGate(obj);
-                    for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
-                } else {
-                    if (obj.kind === 'enemy' && Math.abs(obj.x - player.position.x) < 1.1) {
-                        playerHp--;
-                        hurtFlash = 0.25;
-                    }
-                    removeObject(obj);
+            if (obj.kind === 'gate') {
+                if (previousZ <= player.position.z && obj.z >= player.position.z) {
+                    const pair = objects.filter(gate => gate.kind === 'gate' && gate.pairId === obj.pairId);
+                    const selected = selectCrossedGate(pair, player.position.x, previousZ, obj.z, player.position.z);
+                    if (selected) collectGate(selected);
+                    for (const gate of pair) removeObject(gate);
                 }
+                continue;
             }
+            obj.hitFlash = Math.max(0, obj.hitFlash - dt);
+            obj.group.scale.setScalar(obj.hitFlash > 0 ? 1.06 : 1);
+            if (obj.z > player.position.z + 2) removeObject(obj);
         }
         for (let i = bullets.length - 1; i >= 0; i--) {
             const bullet = bullets[i];
@@ -304,20 +453,39 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 bullet.mesh.material.dispose();
             }
         }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const particle = particles[i];
+            particle.life -= dt;
+            if (particle.life <= 0) {
+                scene.remove(particle.mesh);
+                particle.mesh.geometry.dispose();
+                particle.mesh.material.dispose();
+                particles.splice(i, 1);
+            } else {
+                particle.mesh.position.x += particle.vx * dt;
+                particle.mesh.position.y += particle.vy * dt;
+                particle.mesh.position.z += particle.vz * dt;
+                particle.vy -= 15 * dt;
+                particle.mesh.material.opacity = Math.min(1, particle.life / 0.25);
+            }
+        }
         reportTimer -= dt;
         if (reportTimer <= 0) {
             onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
-        if (remaining <= 0 || playerHp <= 0) finish();
+        if (remaining <= 0 && finishHold === null) finishHold = 0.8;
+        if (finishHold !== null) finishHold -= dt;
+        if (playerHp <= 0 || (finishHold !== null && finishHold <= 0)) finish();
         else frame = requestAnimationFrame(animate);
     }
     function setPointer(event) {
         const rect = renderer.domElement.getBoundingClientRect();
-        targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 8, -3.4, 3.4);
+        targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 12, -5.15, 5.15);
     }
     function pointerDown(event) {
+        hitSound.unlock();
         dragging = true;
         renderer.domElement.setPointerCapture(event.pointerId);
         setPointer(event);
@@ -327,6 +495,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function pointerUp() { dragging = false; }
     function keyDown(event) {
+        hitSound.unlock();
         if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
             event.preventDefault();
             keys.add(event.code);
@@ -336,12 +505,19 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     function resize() {
         const width = host.clientWidth, height = host.clientHeight;
         if (!width || !height) return;
+        const settings = runnerCameraSettings(width, height);
         camera.aspect = width / height;
+        camera.fov = settings.fov;
+        camera.far = settings.far;
+        camera.position.y = settings.y;
+        camera.position.z = settings.z;
+        camera.lookAt(camera.position.x * 0.4, settings.lookY, settings.lookZ);
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
     }
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
+    resize();
     renderer.domElement.addEventListener('pointerdown', pointerDown);
     renderer.domElement.addEventListener('pointermove', pointerMove);
     renderer.domElement.addEventListener('pointerup', pointerUp);
@@ -352,6 +528,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     function destroy() {
         cancelAnimationFrame(frame);
         resizeObserver.disconnect();
+        hitSound.dispose();
         renderer.domElement.removeEventListener('pointerdown', pointerDown);
         renderer.domElement.removeEventListener('pointermove', pointerMove);
         renderer.domElement.removeEventListener('pointerup', pointerUp);
@@ -367,7 +544,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         scene.traverse(node => {
             node.geometry?.dispose();
             const materials = Array.isArray(node.material) ? node.material : node.material ? [node.material] : [];
-            for (const m of materials) m.dispose();
+            for (const m of materials) {
+                m.map?.dispose();
+                m.dispose();
+            }
         });
         renderer.forceContextLoss();
         renderer.dispose();

@@ -1,0 +1,51 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createHitSound} from '../games/dino-rush-battle/core/hit-sound.js';
+
+test('audio feedback stays optional when Web Audio is unavailable', () => {
+    const original = globalThis.AudioContext;
+    const originalWebkit = globalThis.webkitAudioContext;
+    try {
+        delete globalThis.AudioContext;
+        delete globalThis.webkitAudioContext;
+        const audio = createHitSound();
+        assert.doesNotThrow(() => {audio.unlock(); audio.hit(); audio.dispose(); audio.hit();});
+    } finally {
+        globalThis.AudioContext = original;
+        globalThis.webkitAudioContext = originalWebkit;
+    }
+});
+test('audio unlocks on interaction, plays throttled hit tones and disposes', () => {
+    const original = globalThis.AudioContext;
+    const calls = [];
+    class FakeAudioContext {
+        constructor() {this.state = 'suspended'; this.currentTime = 1; this.destination = {};}
+        resume() {this.state = 'running'; return Promise.resolve();}
+        close() {calls.push('close'); return Promise.resolve();}
+        createOscillator() {
+            return {
+                frequency: {setValueAtTime(value) {calls.push(['frequency', value]);}, exponentialRampToValueAtTime() {}},
+                connect() {}, start() {calls.push('start');}, stop() {calls.push('stop');}
+            };
+        }
+        createGain() {
+            return {gain: {setValueAtTime() {}, exponentialRampToValueAtTime() {}}, connect() {}};
+        }
+    }
+    try {
+        globalThis.AudioContext = FakeAudioContext;
+        const audio = createHitSound();
+        audio.hit();
+        assert.equal(calls.length, 0);
+        audio.unlock();
+        audio.hit();
+        audio.hit();
+        assert.equal(calls.filter(item => item === 'start').length, 1);
+        audio.dispose();
+        audio.hit();
+        assert.equal(calls.filter(item => item === 'start').length, 1);
+        assert.ok(calls.includes('close'));
+    } finally {
+        globalThis.AudioContext = original;
+    }
+});

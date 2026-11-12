@@ -18,7 +18,7 @@ export function maxHp(unit, upgrades = {}) {
 export function createRun() {
     return {
         phase: 'runner', stage: 1, money: 0, potions: 0, nextId: 2,
-        army: [{id: 'd1', species: 'raptor', level: 1, hp: 70, cell: 10}],
+        army: [{id: 'd1', species: 'raptor', level: 1, hp: 70, cell: 0}],
         inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1}, battleUpgrades: {damage: 0}, lastResult: null
     };
 }
@@ -29,14 +29,23 @@ export function getEnemies(stage) {
         return {id: 'e' + i, species, level: 1, hp: Math.round(SPECIES[species].hp * (0.75 + stage * 0.11)), cell: i};
     });
 }
+export function nextFreeCell(army, species) {
+    const filled = new Set(army.map(unit => unit.cell));
+    const cells = Array.from({length: 15}, (_, cell) => cell);
+    if (SPECIES[species].role === 'Fernkampf') cells.reverse();
+    return cells.find(cell => !filled.has(cell)) ?? null;
+}
+export function getMergeChoices(first, second) {
+    if (!first || !second || first.id === second.id || first.species !== second.species || first.level !== second.level) return [];
+    return SPECIES[first.species]?.evolutions ?? [];
+}
 export function mergeOptions(army) {
     const result = [];
     for (let i = 0; i < army.length; i++) {
         for (let j = i + 1; j < army.length; j++) {
             const a = army[i], b = army[j];
-            if (a.species === b.species && a.level === b.level && SPECIES[a.species].evolutions.length) {
-                result.push({ids: [a.id, b.id], species: a.species, choices: SPECIES[a.species].evolutions});
-            }
+            const choices = getMergeChoices(a, b);
+            if (choices.length) result.push({ids: [a.id, b.id], species: a.species, choices});
         }
     }
     const seen = new Set();
@@ -59,16 +68,23 @@ export function reduceGame(game, action) {
             for (const species of collected) {
                 const unit = {id: 'd' + run.nextId++, species, level: 1, hp: 0, cell: null};
                 unit.hp = maxHp(unit, next.meta.upgrades);
-                run.inventory.push(unit);
+                const cell = nextFreeCell(run.army, unit.species);
+                if (cell === null) run.inventory.push(unit);
+                else {
+                    unit.cell = cell;
+                    run.army.push(unit);
+                }
             }
             const temporary = action.payload?.temporary ?? {};
             run.temporary = {
-                damage: Math.max(0.25, Math.min(5, Number(temporary.damage) || 1)),
-                fireRate: Math.max(0.25, Math.min(5, Number(temporary.fireRate) || 1)),
-                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1)))
+                damage: Math.max(0.25, Math.min(6, Number(temporary.damage) || 1)),
+                fireRate: Math.max(0.25, Math.min(6, Number(temporary.fireRate) || 1)),
+                bullets: Math.max(1, Math.min(7, Math.floor(Number(temporary.bullets) || 1)))
             };
             run.phase = 'formation';
-            return {game: next, message: 'Lauf abgeschlossen! Stelle dein Team auf.'};
+            return {game: next, message: collected.length
+                ? collected.length + (collected.length === 1 ? ' Dino gerettet und automatisch aufgestellt.' : ' Dinos gerettet und automatisch aufgestellt.') + ' Du kannst die Formation ändern.'
+                : 'Keine neuen Dinos gerettet. Du kannst die Formation trotzdem ändern.'};
         }
         case 'auto-place': {
             if (run.phase !== 'formation') fail('Du kannst dein Team gerade nicht ändern.');
@@ -98,9 +114,11 @@ export function reduceGame(game, action) {
             if (!unit) fail('Dinosaurier nicht gefunden.');
             const occupant = run.army.find(item => item.cell === cell);
             if (occupant && occupant.id !== id) {
-                occupant.cell = null;
-                run.army = run.army.filter(item => item.id !== occupant.id);
-                run.inventory.push(occupant);
+                if (unit.cell === null) {
+                    occupant.cell = null;
+                    run.army = run.army.filter(item => item.id !== occupant.id);
+                    run.inventory.push(occupant);
+                } else occupant.cell = unit.cell;
             }
             run.inventory = run.inventory.filter(item => item.id !== id);
             run.army = run.army.filter(item => item.id !== id);
@@ -115,7 +133,7 @@ export function reduceGame(game, action) {
             const pool = [...run.army, ...run.inventory];
             const a = pool.find(unit => unit.id === ids[0]);
             const b = pool.find(unit => unit.id === ids[1]);
-            if (!a || !b || a.species !== b.species || a.level !== b.level || !SPECIES[a.species].evolutions.includes(into)) fail('Diese Dinosaurier können nicht fusionieren.');
+            if (!getMergeChoices(a, b).includes(into)) fail('Diese Dinosaurier können nicht fusionieren.');
             run.army = run.army.filter(unit => !ids.includes(unit.id));
             run.inventory = run.inventory.filter(unit => !ids.includes(unit.id));
             const upgraded = {id: 'd' + run.nextId++, species: into, level: a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};
