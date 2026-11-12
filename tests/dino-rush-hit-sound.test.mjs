@@ -62,3 +62,33 @@ test('sound can be muted and unmuted using the shared preference', () => {
         setHitSoundEnabled(initial);
     }
 });
+
+test('shooting audio uses a short sawtooth effect and respects mute', () => {
+    const original = globalThis.AudioContext;
+    const started = [];
+    class FakeAudioContext {
+        constructor() {this.state = 'running'; this.currentTime = 5; this.destination = {};}
+        createOscillator() {
+            const instance = {type: 'sine', frequency: {setValueAtTime() {}, exponentialRampToValueAtTime() {}},
+                connect() {}, start() {started.push(this.type);}, stop() {}};
+            return instance;
+        }
+        createGain() {return {gain: {setValueAtTime() {}, exponentialRampToValueAtTime() {}}, connect() {}};}
+        close() {return Promise.resolve();}
+    }
+    try {
+        globalThis.AudioContext = FakeAudioContext;
+        setHitSoundEnabled(true);
+        const player = createHitSound();
+        player.unlock();
+        player.hit('shot');
+        assert.deepEqual(started, ['sawtooth']);
+        setHitSoundEnabled(false);
+        player.hit('shot');
+        assert.deepEqual(started, ['sawtooth']);
+        player.dispose();
+    } finally {
+        setHitSoundEnabled(true);
+        globalThis.AudioContext = original;
+    }
+});

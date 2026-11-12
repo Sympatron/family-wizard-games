@@ -306,7 +306,7 @@ async function beginRunner() {
         onProgress: progress => {
             hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
                 ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets;
+                ' · Kugeln ' + progress.temporary.bullets + ' · Münzen ' + (progress.coins ?? 0);
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
