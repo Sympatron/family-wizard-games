@@ -14,6 +14,7 @@ import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
+import {frameDeltaSeconds} from './timing.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -154,7 +155,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let active = true;
     let dragging = false;
     let frame = 0;
-    let previous = performance.now();
+    let previous = null;
     const keys = new Set();
     let hurtFlash = 0;
 
@@ -419,7 +420,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function animate(time) {
         if (!active) return;
-        const dt = Math.min(0.05, (time - previous) / 1000);
+        const dt = frameDeltaSeconds(previous, time);
         previous = time;
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
