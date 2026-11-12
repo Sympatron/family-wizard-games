@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, reduceGame} from '../games/dino-rush-battle/core/game.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
-import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen} from '../games/dino-rush-battle/core/board-layout.js';
+import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen, clientPointToCell} from '../games/dino-rush-battle/core/board-layout.js';
 
 const apply = (game, type, payload = {}) => reduceGame(game, {type, payload}).game;
 const fresh = () => structuredClone(INITIAL_GAME);
@@ -171,4 +171,27 @@ test('new stage collections preserve the positions of surviving dinosaurs', () =
     for (const unit of previous) assert.equal(game.run.army.find(dino => dino.id === unit.id).cell, unit.cell);
     assert.equal(game.run.army.length, 3);
     assert.equal(game.run.inventory.length, 0);
+});
+
+test('touch and mouse positions map to correct formation cell in scaled canvases', () => {
+    for (const portrait of [true, false]) {
+        const size = portrait ? BOARD_SIZE.portrait : BOARD_SIZE.landscape;
+        for (const scale of [0.3, 0.55, 1, 1.2]) {
+            const rect = {left: 40, top: 75, width: size.width * scale, height: size.height * scale};
+            rect.right = rect.left + rect.width;
+            rect.bottom = rect.top + rect.height;
+            for (let i = 0; i < 15; i++) {
+                const center = battleCellCenter('player', i, portrait);
+                const x = rect.left + center.x * scale;
+                const y = rect.top + center.y * scale;
+                assert.equal(clientPointToCell(x, y, rect, portrait), i);
+            }
+            assert.equal(clientPointToCell(rect.left - 5, rect.top, rect, portrait), null);
+            assert.equal(clientPointToCell(rect.right + 5, rect.bottom, rect, portrait), null);
+        }
+    }
+});
+test('runner rewards retain a seven-projectile gate bonus', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
+    assert.deepEqual(game.run.temporary, {damage: 6, fireRate: 6, bullets: 7});
 });
