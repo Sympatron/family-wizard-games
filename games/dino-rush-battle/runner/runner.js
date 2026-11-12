@@ -4,6 +4,7 @@ import {createGatePair, gateLabel, improveGate, applyGate} from './gates.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
 import {createRunnerWave} from './spawns.js';
+import {bulletHitsCage} from './collision.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -234,34 +235,43 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
         return group;
     }
-    function spawnItem(kind, x, z, species) {
-        const group = new THREE.Group();
-        if (kind === 'cage') group.add(cage(species));
-        else if (kind === 'supply') {
-            const crate = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.65, 1.65), material(0x62b9dc));
-            crate.position.y = 0.85;
-            group.add(crate);
-            const mark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.8, 1.69), material(0xffffff));
-            mark.position.y = 0.9;
-            group.add(mark);
-        } else {
-            const barrier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.55, 0.6), material(0xc45e4d));
-            barrier.position.y = 0.8;
-            group.add(barrier);
-            const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.2, 0.65), material(0xffd98f));
-            stripe.position.y = 1.12;
-            stripe.rotation.z = -0.24;
-            group.add(stripe);
-        }
-        group.position.set(x, 0, z);
-        scene.add(group);
-        objects.push({kind, x, z, species, hp: 2, group});
-    }
     function spawnWave() {
         for (const item of createRunnerWave(spawnCount++, stage)) {
-            spawnItem(item.kind, item.x, item.z, item.species);
+            const group = cage(item.species);
+            group.position.set(item.x, 0, item.z);
+            scene.add(group);
+            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, hp: 2, hitFlash: 0, group});
         }
     }
+    function createFinishGoal() {
+        const group = new THREE.Group();
+        const gold = material(0xf1cb76);
+        const dark = material(0x263a40);
+        const post = (width, height, depth, x, y, z, mat = gold) => {
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+            return mesh;
+        };
+        for (const x of [-6.3, 6.3]) {
+            post(0.5, 5.9, 0.6, x, 2.95, 0);
+            post(0.72, 0.72, 0.72, x, 5.7, 0, dark);
+        }
+        post(13, 0.6, 0.65, 0, 5.85, 0);
+        const sign = gateText('ZIEL', 5.85, 6, 1.4, 190, '#ffffff');
+        sign.position.z = 0.5;
+        group.add(sign);
+        const stripe = new THREE.Mesh(new THREE.BoxGeometry(12.5, 0.045, 0.9), material(0xffffff));
+        stripe.position.set(0, 0.015, 0);
+        group.add(stripe);
+        const mark = material(0x182c35);
+        for (let i = 0; i < 10; i++) {
+            post(1.25, 0.05, 0.9, -5.625 + i * 1.25, 0.045, 0, i % 2 ? gold : mark);
+        }
+        scene.add(group);
+        return group;
+    }
+    const finishGoal = createFinishGoal();
     function disposeGroup(group) {
         scene.remove(group);
         group.traverse(node => {
@@ -295,8 +305,10 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
-            if (Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 3.05 : 1.35)) continue;
-            if (obj.z < bullet.z - 1.25 || obj.z > previousZ + 1.25) continue;
+            const hit = obj.kind === 'gate'
+                ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
+                : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
+            if (!hit) continue;
             if (obj.kind === 'gate') {
                 obj.charge++;
                 if (obj.charge >= 2) {
@@ -306,10 +318,9 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 }
             } else {
                 obj.hp -= temporary.damage;
+                obj.hitFlash = 0.18;
                 if (obj.hp <= 0) {
-                    if (obj.kind === 'cage') collectDinosaur(obj.species);
-                    else if (obj.kind === 'supply') temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
-                    else kills++;
+                    collectDinosaur(obj.species);
                     removeObject(obj);
                 }
             }
@@ -362,6 +373,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             nextGate += 9.8;
         }
         const speed = 17 + stage * 0.6;
+        finishGoal.position.z = player.position.z - speed * remaining;
         for (const marking of markings) {
             marking.position.z += speed * dt;
             if (marking.position.z > 20) marking.position.z -= 320;
@@ -374,16 +386,15 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             if (!objects.includes(obj)) continue;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
+            if (obj.kind === 'cage') {
+                obj.hitFlash = Math.max(0, obj.hitFlash - dt);
+                obj.group.scale.setScalar(obj.hitFlash > 0 ? 1.06 : 1);
+            }
             if (obj.z > 8) {
                 if (obj.kind === 'gate') {
                     if (Math.abs(player.position.x - obj.x) < 3.05) collectGate(obj);
                     for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
                 } else {
-                    if (obj.kind === 'supply' && Math.abs(obj.x - player.position.x) < 1.4) temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
-                    if (['enemy', 'barrier'].includes(obj.kind) && Math.abs(obj.x - player.position.x) < 1.35) {
-                        playerHp--;
-                        hurtFlash = 0.25;
-                    }
                     removeObject(obj);
                 }
             }
