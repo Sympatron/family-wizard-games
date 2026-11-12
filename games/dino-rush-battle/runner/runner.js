@@ -347,7 +347,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         hurtFlash = Math.max(0, hurtFlash - dt);
         player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0x47644b);
         camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.25, 2.5, dt);
-        camera.lookAt(camera.position.x * 0.4, 1.5, -28);
+        camera.lookAt(camera.position.x * 0.4, 1.5, -20);
         shotTimer -= dt;
         if (shotTimer <= 0) {
             shoot();
