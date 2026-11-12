@@ -15,7 +15,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     camera.position.set(0, 8, 17);
     camera.lookAt(0, 0, -16);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer:coarse)').matches ? 1.5 : 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     host.replaceChildren(renderer.domElement);
     scene.add(new THREE.HemisphereLight(0xd6f7ff, 0x354b39, 2.2));
@@ -263,7 +263,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             if (obj.z < bullet.z - 1.25 || obj.z > previousZ + 1.25) continue;
             if (obj.kind === 'gate') {
                 obj.charge++;
-                if (obj.charge >= 3) {
+                if (obj.charge >= 2) {
                     obj.charge = 0;
                     Object.assign(obj, improveGate(obj));
                     updateGate(obj);
