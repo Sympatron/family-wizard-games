@@ -6,6 +6,7 @@ import {runnerCameraSettings} from './camera.js';
 import {createRunnerWave} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
 import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
+import {createHitSound} from '../core/hit-sound.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -111,6 +112,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
 
     const objects = [];
     const bullets = [];
+    const particles = [];
+    const hitSound = createHitSound();
     const collected = [];
     const followers = [];
     const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
@@ -315,8 +318,20 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
         shots++;
     }
+    function burst(x, y, z, kind = 'impact') {
+        const color = kind === 'break' ? 0x7ee6ac : kind === 'upgrade' ? 0x70cfff : 0xffd389;
+        for (let i = 0; i < (kind === 'break' ? 12 : 7); i++) {
+            const mesh = new THREE.Mesh(new THREE.TetrahedronGeometry(0.07 + Math.random() * 0.09),
+                new THREE.MeshBasicMaterial({color, transparent: true, opacity: 1, depthWrite: false}));
+            mesh.position.set(x + (Math.random() - 0.5) * 0.7, y + Math.random() * 0.5, z);
+            scene.add(mesh);
+            particles.push({mesh, life: 0.35, vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4, vz: (Math.random() - 0.5) * 6});
+        }
+    }
     function collectGate(obj) {
         Object.assign(temporary, applyGate(temporary, obj));
+        burst(obj.x, 2.3, player.position.z, 'upgrade');
+        hitSound.hit('upgrade');
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
@@ -324,6 +339,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
                 : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
             if (!hit) continue;
+            burst(bullet.x, obj.kind === 'gate' ? 2 : 2.5, obj.z, 'impact');
+            hitSound.hit('impact');
             if (obj.kind === 'gate') {
                 obj.charge++;
                 if (obj.charge >= 2) {
@@ -340,6 +357,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 fill.position.x = -2.45 * (1 - fraction) / 2;
                 fill.material.color.setHex(fraction > 0.5 ? 0x65e59b : 0xffc16b);
                 if (obj.hp <= 0) {
+                    burst(obj.x, 2.1, obj.z, 'break');
+                    hitSound.hit('break');
                     collectDinosaur(obj.species);
                     removeObject(obj);
                 }
@@ -434,6 +453,22 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 bullet.mesh.material.dispose();
             }
         }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const particle = particles[i];
+            particle.life -= dt;
+            if (particle.life <= 0) {
+                scene.remove(particle.mesh);
+                particle.mesh.geometry.dispose();
+                particle.mesh.material.dispose();
+                particles.splice(i, 1);
+            } else {
+                particle.mesh.position.x += particle.vx * dt;
+                particle.mesh.position.y += particle.vy * dt;
+                particle.mesh.position.z += particle.vz * dt;
+                particle.vy -= 15 * dt;
+                particle.mesh.material.opacity = Math.min(1, particle.life / 0.25);
+            }
+        }
         reportTimer -= dt;
         if (reportTimer <= 0) {
             onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary});
@@ -450,6 +485,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 12, -5.15, 5.15);
     }
     function pointerDown(event) {
+        hitSound.unlock();
         dragging = true;
         renderer.domElement.setPointerCapture(event.pointerId);
         setPointer(event);
@@ -459,6 +495,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function pointerUp() { dragging = false; }
     function keyDown(event) {
+        hitSound.unlock();
         if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
             event.preventDefault();
             keys.add(event.code);
@@ -491,6 +528,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     function destroy() {
         cancelAnimationFrame(frame);
         resizeObserver.disconnect();
+        hitSound.dispose();
         renderer.domElement.removeEventListener('pointerdown', pointerDown);
         renderer.domElement.removeEventListener('pointermove', pointerMove);
         renderer.domElement.removeEventListener('pointerup', pointerUp);
