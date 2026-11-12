@@ -145,7 +145,7 @@ function gameOver() {
 }
 function beginRunner() {
     const game = state.game;
-    heading.textContent = 'Stufe ' + game.run.stage + ' — Dino-Rush';
+    heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
     help.textContent = '← → oder auf der Strecke wischen. Triff Käfige zum Befreien und schieße auf Tore, um ihre Boni zu verbessern.';
     activeView = startRunner(host, {

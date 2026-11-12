@@ -2,7 +2,7 @@ export function mountDevtools(backend, parent = document.body) {
     if (backend.kind !== 'mock') return () => {};
     const panel = document.createElement('details');
     panel.className = 'devtools';
-    panel.innerHTML = `<summary>Entwicklerwerkzeuge · Mock</summary>
+    panel.innerHTML = `<summary title="Mock-Werkzeuge" aria-label="Mock-Werkzeuge"><span aria-hidden="true">☰</span></summary>
       <div class="devtools-content">
         <label>Benutzer<select data-user></select></label>
         <label>Münzen<input type="number" min="0" step="1" data-coins></label>
