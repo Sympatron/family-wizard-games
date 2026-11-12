@@ -22,10 +22,10 @@ The first command assembles `dist/`; the second runs optional local Node tests. 
 ## Site structure and deployment
 
 - `main` publishes the stable launcher and games to `https://sympatron.github.io/family-wizard-games/`.
-- `dev` publishes the development snapshot to `https://sympatron.github.io/family-wizard-games/preview/`.
+- `dev` publishes the development snapshot under `https://sympatron.github.io/family-wizard-games/preview/`. The `/preview/` landing page lists **all open PRs**, with playable links for each same-repository PR and a link to GitHub for fork PRs; it also links to games from `dev`.
 - A push to either branch rebuilds and deploys **both** snapshots in one GitHub Pages site. Before `dev` exists, preview temporarily mirrors `main`.
 - Every open same-repository pull request gets an isolated preview at `https://sympatron.github.io/family-wizard-games/preview/pr-<number>/`. It refreshes after each PR commit (via the build-check workflow) **without merging**. Closing the PR removes its preview on the next deployment. PRs from forks receive build checks but are not hosted.
-- Each GitHub Pages deployment rebuilds stable, dev and all open same-repository PR snapshots together. GitHub Pages hosts one artifact, so publishing just one PR in isolation would otherwise erase the others.
+- Each GitHub Pages deployment rebuilds stable, dev and all open same-repository PR snapshots together. GitHub Pages hosts one artifact, so publishing just one PR in isolation would otherwise erase the others. The Pages workflow cancels superseded deployments to prevent a long backlog during rapid commits. PR checks must pass before they trigger publishing.
 - Pull requests run only the lightweight static build check; no tests, linting, Docker or Python are run by CI.
 - Each deployment contains a `version.json` with the source branch commit SHA. Open pages check for changes every eight seconds and reload without discarding mock local storage.
 
