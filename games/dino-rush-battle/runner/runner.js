@@ -15,6 +15,7 @@ import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
 import {frameDeltaSeconds} from './timing.js';
+import {cageBarLayout} from './cage-layout.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -225,33 +226,29 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function cage(species) {
         const group = new THREE.Group();
-        const frame = material(0x6a5843);
-        const iron = new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35});
-        const lock = new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3});
-        function bar(width, height, depth, x, y, z, mat = iron) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
-            mesh.position.set(x, y, z);
-            group.add(mesh);
-            return mesh;
-        }
         const creature = dinosaur(species, DINOSAURS[species].color);
         creature.scale.setScalar(0.68);
         creature.rotation.y = Math.PI;
         group.add(creature);
-        bar(2.85, 0.3, 2.85, 0, 0.1, 0, frame);
-        bar(2.85, 0.26, 2.85, 0, 3.05, 0, frame);
-        for (const x of [-1.36, 1.36]) {
-            for (const z of [-1.36, 1.36]) bar(0.18, 3.05, 0.18, x, 1.6, z, frame);
+        const barLayout = cageBarLayout();
+        const batches = [
+            [barLayout.frame, material(0x6a5843)],
+            [barLayout.iron, new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35})],
+            [barLayout.latch, new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3})]
+        ];
+        const dummy = new THREE.Object3D();
+        for (const [bars, mat] of batches) {
+            const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, bars.length);
+            for (const [index, bar] of bars.entries()) {
+                dummy.position.set(...bar.position);
+                dummy.scale.set(...bar.size);
+                dummy.updateMatrix();
+                mesh.setMatrixAt(index, dummy.matrix);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            mesh.computeBoundingSphere();
+            group.add(mesh);
         }
-        for (const z of [-1.36, 1.36]) {
-            for (const x of [-1.01, -0.67, -0.33, 0, 0.33, 0.67, 1.01]) bar(0.065, 2.8, 0.08, x, 1.59, z);
-            bar(2.8, 0.09, 0.09, 0, 1.58, z);
-        }
-        for (const x of [-1.36, 1.36]) {
-            for (const z of [-0.82, -0.27, 0.27, 0.82]) bar(0.08, 2.8, 0.065, x, 1.59, z);
-        }
-        for (const x of [-0.72, 0, 0.72]) bar(0.08, 0.075, 2.85, x, 3.2, 0);
-        bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
         const background = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.37, 0.1),
             new THREE.MeshBasicMaterial({color: 0x14252c, depthTest: false}));
         background.position.set(0, 3.72, 1.38);
