@@ -22,8 +22,13 @@ footer { margin-top: 38px; font-size: .8rem; color: #99a5b9; }
 .game-stats { display: flex; flex-wrap: wrap; gap: 20px; margin: 20px 0; }
 .game-stats strong { font-size: 1.7rem; display: block; }
 .game-buttons { display: flex; flex-wrap: wrap; gap: 10px; }
-.devtools { position: fixed; right: 12px; bottom: 12px; width: min(420px, calc(100vw - 24px)); max-height: 80vh; overflow: auto; z-index: 100; border: 1px solid #818cf8; border-radius: 12px; background: #1f2937; box-shadow: 0 12px 38px #0008; }
-.devtools summary { padding: 13px; cursor: pointer; background: #312e81; font-weight: 700; }
+.devtools { position: fixed; right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); width: 44px; height: 44px; z-index: 100; }
+.devtools summary { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #818cf8; border-radius: 12px; background: #312e81; color: #fff; box-shadow: 0 4px 16px #0009; cursor: pointer; font-size: 24px; line-height: 1; list-style: none; user-select: none; }
+.devtools summary::-webkit-details-marker { display: none; }
+.devtools summary::marker { content: ''; }
+.devtools summary:hover, .devtools[open] summary { background: #4338ca; }
+.devtools summary:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 3px; }
+.devtools .devtools-content { position: absolute; right: 0; bottom: 52px; width: min(420px, calc(100vw - 16px)); max-height: calc(100dvh - 80px); overflow-y: auto; overscroll-behavior: contain; border: 1px solid #818cf8; border-radius: 12px; background: #1f2937; box-shadow: 0 12px 38px #0008; }
 .devtools-content { padding: 12px; display: grid; gap: 10px; }
 .devtools label { display: grid; gap: 4px; font-size: .9rem; }
 .devtools input, .devtools select, .devtools textarea { width: 100%; padding: 7px; border-radius: 7px; border: 1px solid #64748b; background: #111827; color: inherit; }

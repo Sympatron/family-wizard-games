@@ -1,4 +1,4 @@
-# Dino Rush & Battle — Game Design and Implementation Plan
+# Dino Rush — Game Design and Implementation Plan
 
 Status: **design agreed at a high level; mechanics and balancing intentionally open**.
 
@@ -6,11 +6,11 @@ Status: **design agreed at a high level; mechanics and balancing intentionally o
 
 Add a browser game to Family Wizard Games targeting ages **8–12**. The game combines a short, forward-running 3D shooting/collection phase with a 2D tactical dinosaur autobattler. The overall experience is a **roguelite**: build an army across consecutive stages, eventually lose, spend earned meta currency on permanent improvements, and begin a new run.
 
-Working title: **Dino Rush & Battle** (not final). All visible UI text must be **German**, even if internal identifiers and documentation are English.
+Name: **Dino Rush**. All visible UI text must be **German**, even if internal identifiers and documentation are English.
 
 ### Core loop
 
-1. **Runner** (target length 60–120 seconds): travel forward automatically, steer horizontally, shoot enemies, choose and modify gates, and free dinosaurs.
+1. **Runner** (target length 35 seconds): travel forward automatically, steer horizontally, shoot enemies, choose and modify gates, and free dinosaurs.
 2. **Formation & evolution**: place collected dinosaurs on a 3×5 player grid, evolve compatible dinosaurs, and prepare for battle.
 3. **Autobattle**: an opposing team on its own 3×5 grid fights the player's army without manual combat commands.
 4. **Rewards & recovery**: after victory, receive run money, heal or revive dinosaurs using purchasable potions, and enter the next stage.
@@ -30,7 +30,7 @@ The player should feel that runner performance affects army quality, while forma
 | Opponents | Enemies approach from the front |
 | Gate selection | Typically two mutually exclusive gates; each changes stats such as damage, rate of fire, bullets/projectiles |
 | Gate interaction | Gates are shootable; negative modifiers can be changed into positive ones by shooting |
-| Runner length | Approximately **60–120 seconds** per stage |
+| Runner length | Approximately **35 seconds** per stage |
 | Dino acquisition | Shoot **cages/obstacles** to free collectible dinosaurs (not directly shoot dinos to collect them) |
 | Battle presentation | 2D initially |
 | Grids | Player and enemy each have a **3×5** formation grid |
