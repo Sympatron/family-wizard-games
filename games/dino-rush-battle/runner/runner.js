@@ -1,9 +1,10 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
 import {SPECIES as DINOSAURS} from '../core/game.js';
+import {createGatePair, gateLabel, improveGate, applyGate} from './gates.js';
+import {createRanger} from './ranger.js';
 
 const DURATION = 35;
 const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
-const GATE_KINDS = ['damage', 'fireRate', 'bullets'];
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
 export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
@@ -11,8 +12,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 50, 150);
     const camera = new THREE.PerspectiveCamera(66, 1, 0.1, 250);
-    camera.position.set(0, 8, 23);
-    camera.lookAt(0, 7.5, -17);
+    camera.position.set(0, 8, 17);
+    camera.lookAt(0, 0, -16);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
@@ -77,11 +78,33 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         result.userData.skin = skin;
         return result;
     }
-    box(8.7, 0.2, 230, 0x395a46, 0, -0.18, -49);
-    box(0.25, 1, 230, 0x86b177, -4.5, 0.3, -49);
-    box(0.25, 1, 230, 0x86b177, 4.5, 0.3, -49);
-    const markings = Array.from({length: 16}, (_, i) => box(0.12, 0.015, 4.2, 0xb5d4a1, 0, 0.01, 12 - i * 9));
-    const player = dinosaur('raptor', 0xf5c768);
+    box(13, 0.2, 230, 0x395a46, 0, -0.18, -49);
+    box(0.3, 0.8, 230, 0x86b177, -6.65, 0.3, -49);
+    box(0.3, 0.8, 230, 0x86b177, 6.65, 0.3, -49);
+    const markings = Array.from({length: 30}, (_, i) => box(0.13, 0.02, 3.8, 0xb5d4a1, i % 2 ? 2.15 : -2.15, 0.01, 12 - Math.floor(i / 2) * 9));
+    const scenery = [];
+    for (let i = 0; i < 48; i++) {
+        const decoration = new THREE.Group();
+        const side = i % 2 ? 1 : -1;
+        const x = side * (8.4 + (i % 4) * 2.2);
+        const z = 16 - Math.floor(i / 2) * 7;
+        if (i % 5 === 0) {
+            const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1.2 + i % 3 * 0.3), material(0x7f9991));
+            rock.scale.y = 0.6;
+            rock.position.y = 0.6;
+            decoration.add(rock);
+        } else {
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, 2.6, 6), material(0x806044));
+            trunk.position.y = 1.3;
+            const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.3 + i % 3 * 0.18, 3.8, 7), material(i % 3 ? 0x3e865d : 0x569a68));
+            leaves.position.y = 4.2;
+            decoration.add(trunk, leaves);
+        }
+        decoration.position.set(x, 0, z);
+        scene.add(decoration);
+        scenery.push(decoration);
+    }
+    const player = createRanger(THREE);
     scene.add(player);
     player.position.set(0, 0, 8);
 
@@ -95,8 +118,9 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let shots = 0;
     let kills = 0;
     let spawnCount = 0;
-    let nextSpawn = 1;
-    let nextGate = 8;
+    let nextSpawn = 0.5;
+    let nextGate = 4.2;
+    let gateCount = 0;
     let shotTimer = 0;
     let reportTimer = 0;
     let targetX = 0;
@@ -119,7 +143,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         ctx.lineWidth = 3;
         ctx.strokeRect(2, 11, 252, 74);
         ctx.fillStyle = color;
-        ctx.font = 'bold 33px system-ui';
+        ctx.font = 'bold 30px system-ui';
+        if (ctx.measureText(text).width > 228) ctx.font = 'bold 24px system-ui';
         ctx.textAlign = 'center';
         ctx.fillText(text, 128, 61);
         const texture = new THREE.CanvasTexture(canvas);
@@ -127,10 +152,6 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         sprite.scale.set(3.3, 1.3, 1);
         sprite.position.y = 4.2;
         return sprite;
-    }
-    function gateText(obj) {
-        const name = obj.modifier === 'damage' ? 'SCHADEN' : obj.modifier === 'fireRate' ? 'TEMPO' : 'KUGELN';
-        return name + ' ' + (obj.level > 0 ? '+' : '') + obj.level;
     }
     function updateGate(obj) {
         obj.mesh.material.color.setHex(obj.level > 0 ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xc0b66b);
@@ -140,41 +161,69 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             old.material.map.dispose();
             old.material.dispose();
         }
-        obj.label = label(gateText(obj));
+        obj.label = label(gateLabel(obj));
         obj.group.add(obj.label);
     }
     function spawnGatePair() {
-        const modifier = GATE_KINDS[Math.floor(stage + elapsed / 18) % GATE_KINDS.length];
-        for (const [x, level] of [[-2.15, -2], [2.15, 1]]) {
+        const definitions = createGatePair(stage, gateCount++);
+        for (const [i, definition] of definitions.entries()) {
+            const x = i === 0 ? -3.2 : 3.2;
             const group = new THREE.Group();
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(2.6, 3.6, 0.35), material(0xcccccc));
+            const mesh = new THREE.Mesh(new THREE.BoxGeometry(3.1, 3.6, 0.35), material(0xcccccc));
             mesh.position.y = 1.85;
             group.add(mesh);
-            group.position.set(x, 0, -95);
+            group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {kind: 'gate', x, z: -95, level, modifier, charge: 0, mesh, group, label: null, resolved: false};
+            const obj = {...definition, kind: 'gate', x, z: -80, charge: 0, mesh, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
     }
-    function spawnEnemyOrCage() {
-        const isCage = spawnCount % 3 !== 1;
-        const x = [-2.6, 0, 2.6][(spawnCount + stage) % 3];
+    function spawnItem(kind, x, z, species) {
         const group = new THREE.Group();
-        const species = SPECIES[(spawnCount + Math.floor(stage / 2)) % SPECIES.length];
-        const creature = dinosaur(species, isCage ? DINOSAURS[species].color : 0xda7766);
-        creature.scale.setScalar(isCage ? 0.68 : 0.9);
-        creature.rotation.y = Math.PI;
-        group.add(creature);
-        if (isCage) {
-            const cage = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.75, 2.75), material(0xf0d28c));
-            cage.position.y = 1.2;
-            cage.material.wireframe = true;
-            group.add(cage);
+        if (kind === 'cage' || kind === 'enemy') {
+            const creature = dinosaur(species, kind === 'cage' ? DINOSAURS[species].color : 0xda7766);
+            creature.scale.setScalar(kind === 'cage' ? 0.68 : 0.9);
+            creature.rotation.y = Math.PI;
+            group.add(creature);
+            if (kind === 'cage') {
+                const cage = new THREE.Mesh(new THREE.BoxGeometry(2.3, 2.8, 2.6), material(0xf0d28c));
+                cage.position.y = 1.3;
+                cage.material.wireframe = true;
+                group.add(cage);
+            }
+        } else if (kind === 'supply') {
+            const crate = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.65, 1.65), material(0x62b9dc));
+            crate.position.y = 0.85;
+            group.add(crate);
+            const mark = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.8, 1.69), material(0xffffff));
+            mark.position.y = 0.9;
+            group.add(mark);
+        } else {
+            const barrier = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.55, 0.6), material(0xc45e4d));
+            barrier.position.y = 0.8;
+            group.add(barrier);
+            const stripe = new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.2, 0.65), material(0xffd98f));
+            stripe.position.y = 1.12;
+            stripe.rotation.z = -0.24;
+            group.add(stripe);
         }
-        group.position.set(x, 0, -100);
+        group.position.set(x, 0, z);
         scene.add(group);
-        objects.push({kind: isCage ? 'cage' : 'enemy', x, z: -100, hp: isCage ? 3 : 2 + Math.floor(stage / 3), species, group});
+        objects.push({kind, x, z, species, hp: kind === 'cage' ? 2 : kind === 'enemy' ? 2 + Math.floor(stage / 3) : 2, group});
+    }
+    function spawnWave() {
+        const lanes = [-4.25, 0, 4.25];
+        const first = (spawnCount + stage) % lanes.length;
+        const count = spawnCount % 3 === 0 ? 3 : 2;
+        for (let i = 0; i < count; i++) {
+            const species = SPECIES[(spawnCount + i + Math.floor(stage / 2)) % SPECIES.length];
+            const kind = spawnCount === 0 && i === 0 ? 'cage'
+                : (spawnCount + i) % 7 === 0 ? 'supply'
+                : (spawnCount + i) % 5 === 1 ? 'enemy'
+                : (spawnCount + i) % 5 === 3 ? 'barrier' : 'cage';
+            spawnItem(kind, lanes[(first + i) % lanes.length], -72 - i * 2.5, species);
+        }
         spawnCount++;
     }
     function disposeGroup(group) {
@@ -195,38 +244,35 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         disposeGroup(obj.group);
     }
     function shoot() {
-        const count = Math.min(5, temporary.bullets);
+        const count = Math.min(7, temporary.bullets);
         for (let i = 0; i < count; i++) {
             const x = player.position.x + (i - (count - 1) / 2) * 0.4;
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), material(0xffef9c));
-            mesh.position.set(x, 1.35, 6);
+            mesh.position.set(x, 1.5, 6);
             scene.add(mesh);
             bullets.push({mesh, x, z: 6});
         }
         shots++;
     }
-    function applyGate(obj) {
-        if (obj.level < 0) {
-            if (obj.modifier === 'bullets') temporary.bullets = Math.max(1, temporary.bullets + obj.level);
-            else temporary[obj.modifier] = Math.max(0.35, temporary[obj.modifier] + obj.level * 0.3);
-        } else if (obj.modifier === 'bullets') temporary.bullets = Math.min(5, temporary.bullets + obj.level);
-        else temporary[obj.modifier] = Math.min(5, temporary[obj.modifier] + obj.level * 0.35);
+    function collectGate(obj) {
+        Object.assign(temporary, applyGate(temporary, obj));
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
-            if (obj.resolved || Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 1.35 : 1.1)) continue;
+            if (Math.abs(bullet.x - obj.x) > (obj.kind === 'gate' ? 1.55 : 1.2)) continue;
             if (obj.z < bullet.z - 1.25 || obj.z > previousZ + 1.25) continue;
             if (obj.kind === 'gate') {
                 obj.charge++;
                 if (obj.charge >= 3) {
                     obj.charge = 0;
-                    obj.level = Math.min(3, obj.level + 1);
+                    Object.assign(obj, improveGate(obj));
                     updateGate(obj);
                 }
             } else {
                 obj.hp -= temporary.damage;
                 if (obj.hp <= 0) {
                     if (obj.kind === 'cage') collected.push(obj.species);
+                    else if (obj.kind === 'supply') temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
                     else kills++;
                     removeObject(obj);
                 }
@@ -247,15 +293,15 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         previous = time;
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
-        if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 6.2;
-        if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 6.2;
-        targetX = clamp(targetX, -3.4, 3.4);
+        if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 8;
+        if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 8;
+        targetX = clamp(targetX, -5.15, 5.15);
         player.position.x = THREE.MathUtils.damp(player.position.x, targetX, 14, dt);
         player.rotation.z = (player.position.x - targetX) * 0.07;
         player.position.y = Math.sin(elapsed * 13) * 0.05;
         for (const [index, leg] of player.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 13 + index * Math.PI) * 0.25;
         hurtFlash = Math.max(0, hurtFlash - dt);
-        player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0xf5c768);
+        player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0x47644b);
         camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.3, 2.5, dt);
         shotTimer -= dt;
         if (shotTimer <= 0) {
@@ -263,17 +309,21 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             shotTimer += 0.28 / temporary.fireRate;
         }
         if (elapsed >= nextSpawn) {
-            spawnEnemyOrCage();
-            nextSpawn += 3.1;
+            spawnWave();
+            nextSpawn += 1.65;
         }
         if (elapsed >= nextGate) {
             spawnGatePair();
-            nextGate += 14;
+            nextGate += 9.8;
         }
-        const speed = 12.5 + stage * 0.4;
+        const speed = 17 + stage * 0.6;
         for (const marking of markings) {
             marking.position.z += speed * dt;
-            if (marking.position.z > 18) marking.position.z -= 144;
+            if (marking.position.z > 18) marking.position.z -= 135;
+        }
+        for (const decoration of scenery) {
+            decoration.position.z += speed * dt;
+            if (decoration.position.z > 22) decoration.position.z -= 168;
         }
         for (const obj of [...objects]) {
             if (!objects.includes(obj)) continue;
@@ -281,10 +331,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             obj.group.position.z = obj.z;
             if (obj.z > 8) {
                 if (obj.kind === 'gate') {
-                    if (Math.abs(player.position.x - obj.x) < 1.25) applyGate(obj);
+                    if (Math.abs(player.position.x - obj.x) < 1.6) collectGate(obj);
                     for (const gate of [...objects].filter(item => item.kind === 'gate' && Math.abs(item.z - obj.z) < 2)) removeObject(gate);
                 } else {
-                    if (obj.kind === 'enemy' && Math.abs(obj.x - player.position.x) < 1.1) {
+                    if (obj.kind === 'supply' && Math.abs(obj.x - player.position.x) < 1.4) temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
+                    if (['enemy', 'barrier'].includes(obj.kind) && Math.abs(obj.x - player.position.x) < 1.35) {
                         playerHp--;
                         hurtFlash = 0.25;
                     }
@@ -315,7 +366,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     }
     function setPointer(event) {
         const rect = renderer.domElement.getBoundingClientRect();
-        targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 8, -3.4, 3.4);
+        targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 12, -5.15, 5.15);
     }
     function pointerDown(event) {
         dragging = true;
@@ -337,11 +388,16 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         const width = host.clientWidth, height = host.clientHeight;
         if (!width || !height) return;
         camera.aspect = width / height;
+        const distance = Math.max(9, 13 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect) * 1.16);
+        camera.position.z = 8 + distance;
+        camera.position.y = 7.5 + Math.max(0, 0.9 - camera.aspect) * 2.5;
+        camera.lookAt(camera.position.x, 0, -16);
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
     }
     const resizeObserver = new ResizeObserver(resize);
     resizeObserver.observe(host);
+    resize();
     renderer.domElement.addEventListener('pointerdown', pointerDown);
     renderer.domElement.addEventListener('pointermove', pointerMove);
     renderer.domElement.addEventListener('pointerup', pointerUp);
