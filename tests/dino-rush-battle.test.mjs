@@ -49,6 +49,20 @@ test('loss resets temporary progress and awards persistent meta currency', () =>
     assert.equal(game.meta.upgrades.starterHp, 1);
     assert.ok(game.run.army[0].hp > SPECIES.raptor.hp);
 });
+test('auto placement prioritizes tanks and supports returning dinos to reserve', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: ['pteranodon', 'triceratops', 'raptor']});
+    game = apply(game, 'auto-place');
+    assert.equal(game.run.army.length, 4);
+    assert.equal(game.run.inventory.length, 0);
+    assert.equal(game.run.army[0].species, 'triceratops');
+    assert.equal(game.run.army.at(-1).species, 'pteranodon');
+    assert.deepEqual(game.run.army.map(unit => unit.cell), [0, 1, 2, 3]);
+    const id = game.run.army[0].id;
+    game = apply(game, 'reserve', {id});
+    assert.equal(game.run.army.length, 3);
+    assert.equal(game.run.inventory.find(unit => unit.id === id).cell, null);
+    assert.throws(() => apply(game, 'reserve', {id}));
+});
 test('invalid placements, merges and out-of-order phases are rejected', () => {
     const game = fresh();
     assert.throws(() => apply(game, 'start-battle'));

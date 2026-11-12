@@ -69,7 +69,7 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected);
     heading.textContent = 'Dino-Team aufstellen';
     hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
-    help.textContent = 'Wähle einen Dinosaurier und tippe auf ein Feld. Zwei gleiche Dinosaurier können sich weiterentwickeln.';
+    help.textContent = 'Wähle einen Dino oder ziehe ihn auf ein Feld. Tanks nach vorn, Fernkämpfer nach hinten!';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
@@ -84,6 +84,10 @@ function formation() {
     actions.append(picker);
     const row = document.createElement('div');
     row.className = 'action-row';
+    addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
+    if (run.army.some(unit => unit.id === selected)) {
+        addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
+    }
     const merge = mergeOptions(all);
     for (const option of merge) {
         for (const into of option.choices) {
@@ -172,8 +176,10 @@ function apply(snapshot) {
             message.textContent = '';
             if (phase === 'runner') beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
-                activeView = new BattleView(host, cell => {
-                    if (selected) void execute('place', {id: selected, cell});
+                activeView = new BattleView(host, {
+                    onCell: cell => { if (selected) void execute('place', {id: selected, cell}); },
+                    onSelect: id => { selected = id; formation(); },
+                    onDrop: (id, cell) => { selected = id; void execute('place', {id, cell}); }
                 });
                 if (phase === 'formation') formation();
                 else beginBattle();

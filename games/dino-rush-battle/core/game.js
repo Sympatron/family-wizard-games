@@ -39,7 +39,13 @@ export function mergeOptions(army) {
             }
         }
     }
-    return result;
+    const seen = new Set();
+    return result.filter(option => {
+        const key = option.species + ':' + army.find(unit => unit.id === option.ids[0])?.level;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
 }
 export function reduceGame(game, action) {
     const next = structuredClone(game);
@@ -63,6 +69,25 @@ export function reduceGame(game, action) {
             };
             run.phase = 'formation';
             return {game: next, message: 'Lauf abgeschlossen! Stelle dein Team auf.'};
+        }
+        case 'auto-place': {
+            if (run.phase !== 'formation') fail('Du kannst dein Team gerade nicht ändern.');
+            const priority = {Tank: 0, Nahkampf: 1, Fernkampf: 2};
+            const pool = [...run.army, ...run.inventory];
+            pool.sort((a, b) => Number(b.hp > 0) - Number(a.hp > 0) ||
+                priority[SPECIES[a.species].role] - priority[SPECIES[b.species].role] || b.level - a.level);
+            run.army = pool.slice(0, 15).map((unit, i) => ({...unit, cell: i}));
+            run.inventory = pool.slice(15).map(unit => ({...unit, cell: null}));
+            return {game: next, message: 'Dein Team wurde automatisch aufgestellt.'};
+        }
+        case 'reserve': {
+            if (run.phase !== 'formation') fail('Du kannst dein Team gerade nicht ändern.');
+            const index = run.army.findIndex(unit => unit.id === action.payload?.id);
+            if (index < 0) fail('Dieser Dinosaurier steht nicht auf dem Feld.');
+            const [unit] = run.army.splice(index, 1);
+            unit.cell = null;
+            run.inventory.push(unit);
+            return {game: next, message: 'Dinosaurier in den Vorrat gelegt.'};
         }
         case 'place': {
             if (run.phase !== 'formation') fail('Du kannst dein Team gerade nicht ändern.');
