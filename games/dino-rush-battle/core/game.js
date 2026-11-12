@@ -35,14 +35,17 @@ export function nextFreeCell(army, species) {
     if (SPECIES[species].role === 'Fernkampf') cells.reverse();
     return cells.find(cell => !filled.has(cell)) ?? null;
 }
+export function getMergeChoices(first, second) {
+    if (!first || !second || first.id === second.id || first.species !== second.species || first.level !== second.level) return [];
+    return SPECIES[first.species]?.evolutions ?? [];
+}
 export function mergeOptions(army) {
     const result = [];
     for (let i = 0; i < army.length; i++) {
         for (let j = i + 1; j < army.length; j++) {
             const a = army[i], b = army[j];
-            if (a.species === b.species && a.level === b.level && SPECIES[a.species].evolutions.length) {
-                result.push({ids: [a.id, b.id], species: a.species, choices: SPECIES[a.species].evolutions});
-            }
+            const choices = getMergeChoices(a, b);
+            if (choices.length) result.push({ids: [a.id, b.id], species: a.species, choices});
         }
     }
     const seen = new Set();
@@ -130,7 +133,7 @@ export function reduceGame(game, action) {
             const pool = [...run.army, ...run.inventory];
             const a = pool.find(unit => unit.id === ids[0]);
             const b = pool.find(unit => unit.id === ids[1]);
-            if (!a || !b || a.species !== b.species || a.level !== b.level || !SPECIES[a.species].evolutions.includes(into)) fail('Diese Dinosaurier können nicht fusionieren.');
+            if (!getMergeChoices(a, b).includes(into)) fail('Diese Dinosaurier können nicht fusionieren.');
             run.army = run.army.filter(unit => !ids.includes(unit.id));
             run.inventory = run.inventory.filter(unit => !ids.includes(unit.id));
             const upgraded = {id: 'd' + run.nextId++, species: into, level: a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, reduceGame} from '../games/dino-rush-battle/core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, reduceGame} from '../games/dino-rush-battle/core/game.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
 import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen, clientPointToCell} from '../games/dino-rush-battle/core/board-layout.js';
 
@@ -194,4 +194,21 @@ test('touch and mouse positions map to correct formation cell in scaled canvases
 test('runner rewards retain a seven-projectile gate bonus', () => {
     const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
     assert.deepEqual(game.run.temporary, {damage: 6, fireRate: 6, bullets: 7});
+});
+
+test('same-species same-level drops provide two evolution branches', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'raptor']});
+    const [target, source] = game.run.army.filter(unit => unit.species === 'raptor').slice(0, 2);
+    assert.deepEqual(getMergeChoices(source, target), ['allosaurus', 'troodon']);
+    assert.deepEqual(getMergeChoices(target, target), []);
+    assert.deepEqual(getMergeChoices({...source, level: 2}, target), []);
+    assert.deepEqual(getMergeChoices({...source, species: 'triceratops'}, target), []);
+    const upgraded = apply(game, 'merge', {ids: [target.id, source.id], into: 'troodon'});
+    assert.equal(upgraded.run.army.length, game.run.army.length - 1);
+    const evolved = upgraded.run.army.find(unit => unit.species === 'troodon');
+    assert.ok(evolved);
+    assert.equal(evolved.cell, target.cell);
+    assert.equal(evolved.level, 2);
+    assert.ok(!upgraded.run.army.some(unit => [target.id, source.id].includes(unit.id)));
+    assert.throws(() => apply(game, 'merge', {ids: [target.id, source.id], into: 'ankylosaurus'}));
 });
