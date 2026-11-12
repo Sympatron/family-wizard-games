@@ -66,7 +66,7 @@ function formation() {
     const enemies = getEnemies(run.stage);
     const all = [...run.army, ...run.inventory];
     if (!all.some(unit => unit.id === selected)) selected = all[0]?.id ?? null;
-    activeView.showFormation(run.army, enemies, selected);
+    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades);
     heading.textContent = 'Dino-Team aufstellen';
     hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
     help.textContent = 'Wähle einen Dino oder ziehe ihn auf ein Feld. Tanks nach vorn, Fernkämpfer nach hinten!';
