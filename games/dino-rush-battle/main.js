@@ -1,7 +1,7 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, maxHp, reduceGame} from './core/game.js';
 import {simulateBattle} from './core/battle.js';
 import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
@@ -23,6 +23,9 @@ let appliedRevision = -1;
 let appliedUser = null;
 let activeUser = null;
 let applying = false;
+const mergeDialog = document.createElement('dialog');
+mergeDialog.className = 'dino-merge-dialog';
+document.body.append(mergeDialog);
 
 function addButton(parent, label, callback, {disabled = false, selected: isSelected = false} = {}) {
     const button = document.createElement('button');
@@ -33,6 +36,37 @@ function addButton(parent, label, callback, {disabled = false, selected: isSelec
     button.addEventListener('click', () => void callback());
     parent.append(button);
     return button;
+}
+function chooseEvolution(ids, choices) {
+    if (activePhase !== 'formation' || !choices.length) return;
+    if (mergeDialog.open) mergeDialog.close();
+    mergeDialog.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = 'Dinosaurier fusionieren';
+    const description = document.createElement('p');
+    description.textContent = 'Wähle die Entwicklung für deine beiden gleichen Dinos:';
+    const buttons = document.createElement('div');
+    buttons.className = 'dino-merge-options';
+    for (const species of choices) {
+        addButton(buttons, SPECIES[species].name, () => {
+            mergeDialog.close();
+            void execute('merge', {ids, into: species});
+        });
+    }
+    addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    mergeDialog.append(title, description, buttons);
+    mergeDialog.showModal();
+}
+function dropDinosaur(id, cell) {
+    if (activePhase !== 'formation' || !Number.isInteger(cell)) return;
+    const run = state?.game.run;
+    const pool = [...run.army, ...run.inventory];
+    const source = pool.find(unit => unit.id === id);
+    const target = run.army.find(unit => unit.cell === cell);
+    if (!source || target?.id === id) return;
+    const choices = getMergeChoices(source, target);
+    if (choices.length) chooseEvolution([target.id, source.id], choices);
+    else void execute('place', {id, cell});
 }
 function enableUnitDragging(button, id) {
     button.draggable = true;
@@ -71,7 +105,7 @@ function enableUnitDragging(button, id) {
             ghost?.remove();
             const cell = !cancelled && dragging ? activeView?.clientCell(next.clientX, next.clientY) : null;
             activeView?.showDropCell(null);
-            if (cell !== null && cell !== undefined && activePhase === 'formation') void execute('place', {id, cell});
+            if (cell !== null && cell !== undefined && activePhase === 'formation') dropDinosaur(id, cell);
         }
         function up(next) { cleanup(next, false); }
         function cancel(next) { cleanup(next, true); }
@@ -95,7 +129,7 @@ host.addEventListener('drop', event => {
     const id = event.dataTransfer.getData('text/plain');
     const cell = activeView?.clientCell(event.clientX, event.clientY);
     activeView?.showDropCell(null);
-    if (id && cell !== null && cell !== undefined) void execute('place', {id, cell});
+    if (id && cell !== null && cell !== undefined) dropDinosaur(id, cell);
 });
 function paragraph(parent, text) {
     const element = document.createElement('div');
@@ -120,6 +154,7 @@ async function refresh() {
     catch (error) { message.textContent = error.message; }
 }
 function cleanup() {
+    if (mergeDialog.open) mergeDialog.close();
     activeView?.destroy();
     activeView = null;
     host.replaceChildren();
@@ -132,7 +167,7 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades);
     heading.textContent = 'Dino-Team aufstellen';
     hud.textContent = '3×5 Felder · ' + run.army.length + ' aufgestellt · ' + run.inventory.length + ' im Vorrat';
-    help.textContent = 'Ziehe Dinos auf die Felder, auch aus dem Vorrat. Alternativ Dino wählen und Feld antippen.';
+    help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
@@ -155,9 +190,7 @@ function formation() {
     }
     const merge = mergeOptions(all);
     for (const option of merge) {
-        for (const into of option.choices) {
-            addButton(row, SPECIES[option.species].name + ' → ' + SPECIES[into].name, () => void execute('merge', {ids: option.ids, into}));
-        }
+        addButton(row, SPECIES[option.species].name + ' fusionieren', () => chooseEvolution(option.ids, option.choices));
     }
     actions.append(row);
 }
@@ -241,9 +274,9 @@ function apply(snapshot) {
             if (phase === 'runner') beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
-                    onCell: cell => { if (selected) void execute('place', {id: selected, cell}); },
+                    onCell: cell => { if (selected) dropDinosaur(selected, cell); },
                     onSelect: id => { selected = id; formation(); },
-                    onDrop: (id, cell) => { selected = id; void execute('place', {id, cell}); }
+                    onDrop: (id, cell) => { selected = id; dropDinosaur(id, cell); }
                 });
                 if (phase === 'formation') formation();
                 else beginBattle();

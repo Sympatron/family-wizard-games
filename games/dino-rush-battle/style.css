@@ -60,3 +60,10 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stage.rewards #heading,.dino-stage.gameover #heading {font-size:1.3rem;}
   .dino-stage.rewards #actions,.dino-stage.gameover #actions {padding:6px;}
 }
+
+.dino-merge-dialog {color:#f2f5ed;background:#172d38;border:2px solid #78c5ad;border-radius:16px;padding:20px;width:min(420px,calc(100vw - 24px));max-height:90dvh;box-shadow:0 18px 60px #000a;}
+.dino-merge-dialog::backdrop {background:#000b;}
+.dino-merge-dialog h3 {font-size:1.3rem;margin:0 0 8px;}
+.dino-merge-dialog p {margin:0 0 18px;color:#b4d6d9;}
+.dino-merge-options {display:flex;flex-direction:column;gap:8px;}
+.dino-merge-options button {background:#f0ca7c;color:#142734;border:0;padding:12px;border-radius:10px;font-weight:700;}
