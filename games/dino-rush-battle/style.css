@@ -31,8 +31,9 @@ body {background:#0b1720;color:#eaf5ee;}
 @media (max-width:650px) {
   .dino-app {padding:4px;}
   .dino-header {font-size:.85rem;}
-  .dino-stage {min-height:700px;}
-  #game-view {height:700px;}
+  .dino-stage {min-height:800px;}
+  #game-view {height:800px;}
+  .dino-stage.rewards,.dino-stage.gameover {min-height:500px;}
   .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {min-height:500px;}
   #actions button,#actions select {padding:8px;}
 }
