@@ -31,3 +31,8 @@ export function applyGate(temporary, gate) {
     else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100, 0.25, 6);
     return next;
 }
+
+export function selectCrossedGate(gates, playerX, previousZ, currentZ, playerZ) {
+    if (!gates.length || previousZ > playerZ || currentZ < playerZ) return null;
+    return gates.reduce((best, gate) => !best || Math.abs(playerX - gate.x) < Math.abs(playerX - best.x) ? gate : best, null);
+}

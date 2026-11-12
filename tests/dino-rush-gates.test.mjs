@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGatePair, applyGate, gateLabel, improveGate} from '../games/dino-rush-battle/runner/gates.js';
+import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate} from '../games/dino-rush-battle/runner/gates.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
     for (let stage = 1; stage <= 8; stage++) {
@@ -32,4 +32,16 @@ test('additive and multiplicative modifiers accumulate independently', () => {
     assert.equal(applyGate(base, {modifier: 'fireRate', operation: 'multiply', level: -2}).fireRate, 0.5);
     assert.equal(applyGate(base, {modifier: 'damage', operation: 'multiply', level: -2}).damage, 0.5);
     assert.throws(() => applyGate(base, {modifier: 'unknown', operation: 'add', level: 2}));
+});
+
+test('passing either side or the center of a gate pair reliably selects exactly one gate', () => {
+    const gates = [{x: -3.2, modifier: 'damage', operation: 'add', level: 2}, {x: 3.2, modifier: 'fireRate', operation: 'multiply', level: 2}];
+    for (const playerX of [-5.15, -3.2, -0.05, 0, 0.05, 3.2, 5.15]) {
+        const selected = selectCrossedGate(gates, playerX, 7.7, 8.25, 8);
+        assert.equal(selected, playerX <= 0 ? gates[0] : gates[1]);
+        const bonus = applyGate({damage: 1, fireRate: 1, bullets: 1}, selected);
+        assert.ok(bonus.damage !== 1 || bonus.fireRate !== 1);
+    }
+    assert.equal(selectCrossedGate(gates, 0, 6, 7, 8), null);
+    assert.equal(selectCrossedGate(gates, 0, 9, 10, 8), null);
 });
