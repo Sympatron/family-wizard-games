@@ -212,3 +212,13 @@ test('same-species same-level drops provide two evolution branches', () => {
     assert.ok(!upgraded.run.army.some(unit => [target.id, source.id].includes(unit.id)));
     assert.throws(() => apply(game, 'merge', {ids: [target.id, source.id], into: 'ankylosaurus'}));
 });
+
+test('coins collected during runner add to in-run money and reject invalid rewards', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: [], coins: 17});
+    assert.equal(game.run.money, 17);
+    game = apply(game, 'start-battle');
+    assert.equal(game.run.money, 17);
+    assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: -1}));
+    assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: 1.25}));
+    assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: 10000}));
+});

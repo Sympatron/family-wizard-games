@@ -81,6 +81,9 @@ export function reduceGame(game, action) {
                 fireRate: Math.max(0.25, Math.min(6, Number(temporary.fireRate) || 1)),
                 bullets: Math.max(1, Math.min(7, Math.floor(Number(temporary.bullets) || 1)))
             };
+            const coins = action.payload?.coins ?? 0;
+            if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');
+            run.money += coins;
             run.phase = 'formation';
             return {game: next, message: collected.length
                 ? collected.length + (collected.length === 1 ? ' Dino gerettet und automatisch aufgestellt.' : ' Dinos gerettet und automatisch aufgestellt.') + ' Du kannst die Formation ändern.'
