@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
 import {SPECIES as DINOSAURS} from '../core/game.js';
 import {createGatePair, gateLabel, improveGate, applyGate} from './gates.js';
 import {createRanger} from './ranger.js';
+import {runnerCameraSettings} from './camera.js';
 
 const DURATION = 35;
 const SPECIES = ['raptor', 'triceratops', 'pteranodon'];
@@ -10,10 +11,8 @@ const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
-    scene.fog = new THREE.Fog(0x142734, 50, 150);
-    const camera = new THREE.PerspectiveCamera(66, 1, 0.1, 250);
-    camera.position.set(0, 8, 17);
-    camera.lookAt(0, 0, -16);
+    scene.fog = new THREE.Fog(0x142734, 85, 260);
+    const camera = new THREE.PerspectiveCamera(68, 1, 0.1, 340);
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false});
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer:coarse)').matches ? 1.5 : 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
@@ -78,12 +77,12 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         result.userData.skin = skin;
         return result;
     }
-    box(13, 0.2, 230, 0x395a46, 0, -0.18, -49);
-    box(0.3, 0.8, 230, 0x86b177, -6.65, 0.3, -49);
-    box(0.3, 0.8, 230, 0x86b177, 6.65, 0.3, -49);
-    const markings = Array.from({length: 30}, (_, i) => box(0.13, 0.02, 3.8, 0xb5d4a1, i % 2 ? 2.15 : -2.15, 0.01, 12 - Math.floor(i / 2) * 9));
+    box(13, 0.2, 540, 0x395a46, 0, -0.18, -240);
+    box(0.3, 0.8, 540, 0x86b177, -6.65, 0.3, -240);
+    box(0.3, 0.8, 540, 0x86b177, 6.65, 0.3, -240);
+    const markings = Array.from({length: 40}, (_, i) => box(0.18, 0.02, 3.8, 0xb5d4a1, 0, 0.01, 12 - i * 8));
     const scenery = [];
-    for (let i = 0; i < 48; i++) {
+    for (let i = 0; i < 84; i++) {
         const decoration = new THREE.Group();
         const side = i % 2 ? 1 : -1;
         const x = side * (8.4 + (i % 4) * 2.2);
@@ -111,6 +110,17 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const objects = [];
     const bullets = [];
     const collected = [];
+    const followers = [];
+    const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
+    function collectDinosaur(species) {
+        collected.push(species);
+        if (followers.length >= 15) return;
+        const follower = dinosaur(species, DINOSAURS[species].color);
+        follower.scale.setScalar(0.42);
+        follower.position.set(player.position.x, 0, 9.4);
+        scene.add(follower);
+        followers.push(follower);
+    }
     const temporary = {damage: 1 + (upgrades.runnerDamage ?? 0) * 0.12, fireRate: 1, bullets: 1};
     let remaining = DURATION;
     let elapsed = 0;
@@ -131,26 +141,28 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const keys = new Set();
     let hurtFlash = 0;
 
-    function label(text, color = '#f4f8dd') {
+    function label(text) {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
-        canvas.height = 96;
+        canvas.height = 144;
         const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, 256, 96);
-        ctx.fillStyle = '#142734cf';
-        ctx.fillRect(0, 9, 256, 78);
-        ctx.strokeStyle = '#99c4a5';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(2, 11, 252, 74);
-        ctx.fillStyle = color;
+        ctx.fillStyle = '#142734e5';
+        ctx.fillRect(3, 3, 250, 138);
+        ctx.strokeStyle = '#f2e8ba';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(5, 5, 246, 134);
+        const [property, ...effect] = text.split(' ');
+        ctx.fillStyle = '#f4f8dd';
         ctx.font = 'bold 30px system-ui';
-        if (ctx.measureText(text).width > 228) ctx.font = 'bold 24px system-ui';
         ctx.textAlign = 'center';
-        ctx.fillText(text, 128, 61);
+        ctx.fillText(property, 128, 54);
+        ctx.fillStyle = '#ffe39e';
+        ctx.font = 'bold 45px system-ui';
+        ctx.fillText(effect.join(' '), 128, 117);
         const texture = new THREE.CanvasTexture(canvas);
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
-        sprite.scale.set(3.3, 1.3, 1);
-        sprite.position.y = 4.2;
+        sprite.scale.set(2.85, 1.65, 1);
+        sprite.position.set(0, 1.85, 0.24);
         return sprite;
     }
     function updateGate(obj) {
@@ -271,7 +283,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             } else {
                 obj.hp -= temporary.damage;
                 if (obj.hp <= 0) {
-                    if (obj.kind === 'cage') collected.push(obj.species);
+                    if (obj.kind === 'cage') collectDinosaur(obj.species);
                     else if (obj.kind === 'supply') temporary.fireRate = clamp(temporary.fireRate + 0.3, 0.25, 6);
                     else kills++;
                     removeObject(obj);
@@ -300,9 +312,18 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         player.rotation.z = (player.position.x - targetX) * 0.07;
         player.position.y = Math.sin(elapsed * 13) * 0.05;
         for (const [index, leg] of player.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 13 + index * Math.PI) * 0.25;
+        for (const [index, follower] of followers.entries()) {
+            const row = Math.floor(index / followerOffsets.length);
+            const x = clamp(player.position.x + followerOffsets[index % followerOffsets.length], -5.5, 5.5);
+            follower.position.x = THREE.MathUtils.damp(follower.position.x, x, 4 / (1 + row * 0.3), dt);
+            follower.position.z = player.position.z + 1.4 + row * 1.15;
+            follower.position.y = Math.sin(elapsed * 7 + index) * 0.04;
+            for (const [legIndex, leg] of follower.userData.legs.entries()) leg.rotation.x = Math.sin(elapsed * 7 + legIndex * Math.PI + index) * 0.18;
+        }
         hurtFlash = Math.max(0, hurtFlash - dt);
         player.userData.skin.color.setHex(hurtFlash > 0 ? 0xffffff : 0x47644b);
-        camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.3, 2.5, dt);
+        camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.25, 2.5, dt);
+        camera.lookAt(camera.position.x * 0.4, 1.5, -28);
         shotTimer -= dt;
         if (shotTimer <= 0) {
             shoot();
@@ -319,11 +340,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         const speed = 17 + stage * 0.6;
         for (const marking of markings) {
             marking.position.z += speed * dt;
-            if (marking.position.z > 18) marking.position.z -= 135;
+            if (marking.position.z > 20) marking.position.z -= 320;
         }
         for (const decoration of scenery) {
             decoration.position.z += speed * dt;
-            if (decoration.position.z > 22) decoration.position.z -= 168;
+            if (decoration.position.z > 22) decoration.position.z -= 294;
         }
         for (const obj of [...objects]) {
             if (!objects.includes(obj)) continue;
@@ -387,11 +408,13 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     function resize() {
         const width = host.clientWidth, height = host.clientHeight;
         if (!width || !height) return;
+        const settings = runnerCameraSettings(width, height);
         camera.aspect = width / height;
-        const distance = Math.max(9, 13 / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect) * 1.16);
-        camera.position.z = 8 + distance;
-        camera.position.y = 7.5 + Math.max(0, 0.9 - camera.aspect) * 2.5;
-        camera.lookAt(camera.position.x, 0, -16);
+        camera.fov = settings.fov;
+        camera.far = settings.far;
+        camera.position.y = settings.y;
+        camera.position.z = settings.z;
+        camera.lookAt(camera.position.x * 0.4, settings.lookY, settings.lookZ);
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
     }
