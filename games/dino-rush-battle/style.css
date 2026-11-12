@@ -1,6 +1,6 @@
 html, body {min-height:100%; margin:0;}
 body {background:#0b1720;color:#eaf5ee;}
-.dino-app {max-width:1100px;margin:0 auto;padding:14px;}
+.dino-app {width:100%;max-width:none;margin:0;padding:8px 12px;}
 .dino-header {display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 4px 16px;flex-wrap:wrap;}
 .dino-header a {color:#a8ded1;}
 .dino-header strong {font-size:1.2rem;}
@@ -9,6 +9,9 @@ body {background:#0b1720;color:#eaf5ee;}
 #game-view {position:relative;width:100%;height:560px;touch-action:none;}
 #game-view canvas {display:block;width:100%;height:100%;}
 .dino-stage.formation #game-view canvas,.dino-stage.battle #game-view canvas {width:auto;height:auto;max-width:100%;max-height:100%;margin:auto;}
+.dino-stage.runner {height:calc(100dvh - 108px);min-height:420px;}
+.dino-stage.runner #game-view {height:100%;}
+.dino-stage.formation #actions .unit-picker button {touch-action:none;}
 .dino-stage.formation,.dino-stage.battle {min-height:560px;}
 .dino-stage.formation #game-view,.dino-stage.battle #game-view {height:560px;}
 #overlay {pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;}
@@ -38,8 +41,8 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-header strong {font-size:.95rem;}
   #stats {font-size:.72rem;}
   .dino-help {display:none;}
-  .dino-stage,.dino-stage.formation,.dino-stage.battle {display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:auto;overflow:hidden;}
-  #game-view,.dino-stage.formation #game-view,.dino-stage.battle #game-view {display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;height:auto;width:100%;}
+  .dino-stage,.dino-stage.runner,.dino-stage.formation,.dino-stage.battle {display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:auto;overflow:hidden;}
+  #game-view,.dino-stage.runner #game-view,.dino-stage.formation #game-view,.dino-stage.battle #game-view {display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;height:auto;width:100%;}
   .dino-stage.formation #overlay {position:relative;inset:auto;display:flex;flex:0 0 min(190px,31dvh);min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;gap:1px;align-items:stretch;}
   .dino-stage.formation #heading {padding:3px;font-size:.95rem;}
   .dino-stage.formation #hud {padding:1px 3px;font-size:.73rem;}
