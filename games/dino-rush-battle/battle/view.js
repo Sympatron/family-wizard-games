@@ -1,5 +1,6 @@
 import {SPECIES, maxHp} from '../core/game.js';
 import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
+import {createHitSound} from '../core/hit-sound.js';
 
 const Phaser = window.Phaser;
 export class BattleView {
@@ -18,6 +19,8 @@ export class BattleView {
         this.upgrades = {};
         this.mode = 'formation';
         this.playback = null;
+        this.hitSound = createHitSound();
+        this.previousHp = new Map();
         this.units = new Map();
         this.scene = null;
         this.canvas = null;
@@ -164,6 +167,7 @@ export class BattleView {
     }
 
     handlePointerDown(event) {
+        this.hitSound?.unlock();
         if (this.mode !== 'formation' || (event.pointerType === 'mouse' && event.button !== 0)) return;
         const point = this.pointAtClient(event.clientX, event.clientY);
         if (!point) return;
@@ -237,6 +241,8 @@ export class BattleView {
     }
 
     play(frames, complete) {
+        this.hitSound?.unlock();
+        this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
         this.mode = 'battle';
         this.playback = {frames, index: 0, elapsed: 0, complete};
         this.render();
@@ -280,6 +286,22 @@ export class BattleView {
         return [...player, ...enemy, ...this.reserveUnits()];
     }
 
+    emitHitSparks(raw) {
+        if (!this.scene?.tweens) return;
+        const {x, y} = this.toScreen(raw.x, raw.y);
+        for (let index = 0; index < 7; index++) {
+            const angle = index * Math.PI * 2 / 7;
+            const speed = 18 + Math.random() * 19;
+            const spark = this.scene.add.circle(x, y, 2.5 + Math.random() * 2, index % 2 ? 0xffc779 : 0xff8069).setDepth(20);
+            this.scene.tweens.add({
+                targets: spark, x: x + Math.cos(angle) * speed, y: y + Math.sin(angle) * speed,
+                alpha: 0, scale: 0.2, duration: 250,
+                onComplete: () => spark.destroy()
+            });
+        }
+        this.hitSound?.hit('impact');
+    }
+
     createUnit(unit) {
         const scene = this.scene;
         const container = scene.add.container(unit.x, unit.y).setDepth(1);
@@ -312,6 +334,11 @@ export class BattleView {
         for (const raw of frame) {
             const unit = isFormation ? raw : {...raw, ...this.toScreen(raw.x, raw.y)};
             const key = unit.team + ':' + unit.id;
+            if (!isFormation) {
+                const previous = this.previousHp?.get(key);
+                if (previous !== undefined && unit.hp < previous) this.emitHitSparks(raw);
+                this.previousHp?.set(key, unit.hp);
+            }
             visible.add(key);
             const entry = this.units.get(key) ?? this.createUnit(unit);
             entry.targetX = unit.x;
@@ -336,6 +363,7 @@ export class BattleView {
         if (this.destroyed) return;
         this.destroyed = true;
         this.playback = null;
+        this.hitSound?.dispose();
         if (this.canvas) {
             this.canvas.removeEventListener('pointerdown', this.pointerDown);
             this.canvas.removeEventListener('pointermove', this.pointerMove);
