@@ -40,11 +40,11 @@ export class BattleView {
         this.scene = scene;
         const background = scene.add.graphics();
         background.fillStyle(0x213a44, 1);
-        if (this.portrait) background.fillRoundedRect(14, 546, 512, 260, 15);
-        else background.fillRoundedRect(220, 375, 520, 173, 15);
+        if (this.portrait) background.fillRoundedRect(14, 328, 512, 174, 15);
+        else background.fillRoundedRect(250, 328, 460, 174, 15);
         background.fillStyle(0x47373f, 1);
-        if (this.portrait) background.fillRoundedRect(14, 178, 512, 230, 15);
-        else background.fillRoundedRect(220, 108, 520, 173, 15);
+        if (this.portrait) background.fillRoundedRect(14, 42, 512, 174, 15);
+        else background.fillRoundedRect(250, 42, 460, 174, 15);
         const grid = scene.add.graphics();
         for (const team of ['player', 'enemy']) {
             for (let depth = 0; depth < 3; depth++) {
@@ -53,17 +53,17 @@ export class BattleView {
                     grid.lineStyle(1.5, team === 'player' ? 0x8cb6b0 : 0xc6a7a2, 0.75);
                     grid.fillStyle(team === 'player' ? 0x325a58 : 0x62494b, 0.75);
                     const width = this.portrait ? 82 : 80;
-                    const height = this.portrait ? 62 : 50;
+                    const height = 48;
                     grid.fillRoundedRect(x - width / 2, y - height / 2, width, height, 8);
                     grid.strokeRoundedRect(x - width / 2, y - height / 2, width, height, 8);
                 }
             }
         }
-        scene.add.text(this.portrait ? 270 : 837, this.portrait ? 830 : 454, 'DEIN TEAM',
+        scene.add.text(this.portrait ? 270 : 480, 536, 'DEIN TEAM',
             {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
-        scene.add.text(this.portrait ? 270 : 837, this.portrait ? 146 : 180, 'GEGNER',
+        scene.add.text(this.portrait ? 270 : 480, 20, 'GEGNER',
             {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
-        this.hint = scene.add.text(this.portrait ? 270 : 480, this.portrait ? 478 : 603, '',
+        this.hint = scene.add.text(this.portrait ? 270 : 480, 270, '',
             {fontFamily: 'system-ui', fontSize: '19px', color: '#b4d6d9'}).setOrigin(0.5);
         scene.input.on('pointerdown', (pointer, objects) => {
             if (this.mode !== 'formation' || objects.some(object => object.getData('unitId'))) return;

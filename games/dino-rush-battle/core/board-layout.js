@@ -1,6 +1,6 @@
 export const BOARD_SIZE = Object.freeze({
-    portrait: {width: 540, height: 880},
-    landscape: {width: 960, height: 640}
+    portrait: {width: 540, height: 560},
+    landscape: {width: 960, height: 560}
 });
 
 const FIRST_LANE_Y = 82;
@@ -10,8 +10,8 @@ const CELL_SPACING_Y = 58;
 
 export function toBattleScreen(x, y, portrait) {
     return portrait
-        ? {x: 72 + (y - FIRST_LANE_Y) * 1.65, y: 480 + (480 - x) * 1.1}
-        : {x: 480 + (y - 198) * 1.5, y: 325 + (480 - x) * 0.8};
+        ? {x: 72 + (y - FIRST_LANE_Y) * 1.65, y: 270 + (480 - x) * 0.85}
+        : {x: 480 + (y - 198) * 1.5, y: 270 + (480 - x) * 0.85};
 }
 
 export function battleCellCenter(team, cell, portrait) {
@@ -23,7 +23,7 @@ export function battleCellCenter(team, cell, portrait) {
 
 export function battleCellAt(x, y, portrait) {
     const halfWidth = portrait ? 42 : 40;
-    const halfHeight = portrait ? 32 : 25;
+    const halfHeight = 24;
     for (let cell = 0; cell < 15; cell++) {
         const center = battleCellCenter('player', cell, portrait);
         if (Math.abs(center.x - x) <= halfWidth && Math.abs(center.y - y) <= halfHeight) return cell;

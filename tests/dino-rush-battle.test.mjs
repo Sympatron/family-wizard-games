@@ -106,3 +106,16 @@ test('combat board uses horizontally rotated grids with opponents above the play
         assert.ok(origin.x > 0 && origin.y > 0);
     }
 });
+
+test('combat grids remain separated near the top and bottom of compact boards', () => {
+    for (const portrait of [false, true]) {
+        const {width, height} = portrait ? BOARD_SIZE.portrait : BOARD_SIZE.landscape;
+        const top = Array.from({length: 15}, (_, i) => battleCellCenter('enemy', i, portrait));
+        const bottom = Array.from({length: 15}, (_, i) => battleCellCenter('player', i, portrait));
+        assert.ok(Math.min(...top.map(p => p.y)) < height * 0.2);
+        assert.ok(Math.max(...top.map(p => p.y)) < height / 2);
+        assert.ok(Math.min(...bottom.map(p => p.y)) > height / 2);
+        assert.ok(Math.max(...top.map(p => p.y)) + 30 < Math.min(...bottom.map(p => p.y)) - 30);
+        assert.ok([...top, ...bottom].every(p => p.x > 20 && p.x < width - 20 && p.y > 40 && p.y < height - 40));
+    }
+});

@@ -9,8 +9,8 @@ body {background:#0b1720;color:#eaf5ee;}
 #game-view {position:relative;width:100%;height:560px;touch-action:none;}
 #game-view canvas {display:block;width:100%;height:100%;}
 .dino-stage.formation #game-view canvas,.dino-stage.battle #game-view canvas {width:auto;height:auto;max-width:100%;max-height:100%;margin:auto;}
-.dino-stage.formation,.dino-stage.battle {min-height:640px;}
-.dino-stage.formation #game-view,.dino-stage.battle #game-view {height:640px;}
+.dino-stage.formation,.dino-stage.battle {min-height:560px;}
+.dino-stage.formation #game-view,.dino-stage.battle #game-view {height:560px;}
 #overlay {pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;}
 #heading {font-weight:750;font-size:clamp(1.2rem,4vw,2rem);text-align:center;text-shadow:0 2px 6px #000;padding:8px;}
 #hud {width:100%;padding:8px 16px;box-sizing:border-box;text-align:center;text-shadow:0 2px 5px #000;}
@@ -31,14 +31,27 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {position:relative;min-height:560px;justify-content:center;gap:14px;}
 .dino-stage.rewards #actions,.dino-stage.gameover #actions {max-width:720px;}
 .dino-stage.rewards #hud,.dino-stage.gameover #hud {font-size:1.15rem;}
-@media (max-width:650px) {
-  .dino-app {padding:4px;}
-  .dino-header {font-size:.85rem;}
-  .dino-stage {min-height:800px;}
-  #game-view {height:800px;}
-  .dino-stage.formation,.dino-stage.battle {min-height:800px;}
-  .dino-stage.formation #game-view,.dino-stage.battle #game-view {height:800px;}
-  .dino-stage.rewards,.dino-stage.gameover {min-height:500px;}
-  .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {min-height:500px;}
-  #actions button,#actions select {padding:8px;}
+@media (max-width:650px), (max-height:600px) and (pointer:coarse) {
+  html,body {height:100%;min-height:0;overflow:hidden;}
+  .dino-app {display:flex;flex-direction:column;height:100vh;height:100dvh;min-height:0;max-width:none;padding:4px;overflow:hidden;}
+  .dino-header {flex:0 0 auto;gap:4px;padding:2px 4px 5px;font-size:.78rem;}
+  .dino-header strong {font-size:.95rem;}
+  #stats {font-size:.72rem;}
+  .dino-help {display:none;}
+  .dino-stage,.dino-stage.formation,.dino-stage.battle {display:flex;flex-direction:column;flex:1 1 auto;min-height:0;height:auto;overflow:hidden;}
+  #game-view,.dino-stage.formation #game-view,.dino-stage.battle #game-view {display:flex;justify-content:center;align-items:center;flex:1 1 auto;min-height:0;height:auto;width:100%;}
+  .dino-stage.formation #overlay {position:relative;inset:auto;display:flex;flex:0 0 min(190px,31dvh);min-height:0;width:100%;overflow-y:auto;overflow-x:hidden;gap:1px;align-items:stretch;}
+  .dino-stage.formation #heading {padding:3px;font-size:.95rem;}
+  .dino-stage.formation #hud {padding:1px 3px;font-size:.73rem;}
+  .dino-stage.formation #actions {display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:5px;padding:5px;margin:0;max-height:none;overflow:visible;}
+  .dino-stage.formation #message {font-size:.72rem;margin:0 0 3px;}
+  .dino-stage.formation .unit-picker,.dino-stage.formation .action-row {display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;width:100%;overflow-x:auto;scrollbar-width:thin;}
+  .dino-stage.formation #actions button {flex:0 0 auto;white-space:nowrap;padding:7px;font-size:.74rem;}
+  .dino-stage.battle #heading,.dino-stage.battle #hud {display:none;}
+  .dino-stage.runner #heading {font-size:1.05rem;padding:4px;}
+  .dino-stage.runner #hud {padding:4px 6px;font-size:.7rem;}
+  .dino-stage.rewards #game-view,.dino-stage.gameover #game-view {display:none;}
+  .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {position:relative;inset:auto;flex:1 1 auto;min-height:0;height:100%;justify-content:flex-start;padding:12px 4px;gap:8px;overflow-y:auto;}
+  .dino-stage.rewards #heading,.dino-stage.gameover #heading {font-size:1.3rem;}
+  .dino-stage.rewards #actions,.dino-stage.gameover #actions {padding:6px;}
 }
