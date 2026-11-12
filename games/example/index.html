@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Beispielspiel – Family Wizard</title>
+  <link rel="stylesheet" href="../../styles.css">
+  <script type="module" src="./main.js"></script>
+</head>
+<body>
+  <main class="container">
+    <a href="../../">← Alle Spiele</a>
+    <header class="hero"><div class="eyebrow">Family Wizard Games</div><h1>Beispielspiel</h1><p>Die Spielaktionen nutzen dieselbe Schnittstelle wie später ein echter Wizard-Server.</p></header>
+    <section class="game-surface" aria-label="Spiel">
+      <div id="player" class="eyebrow"></div>
+      <div class="game-stats">
+        <div>Sterne <strong id="stars">0</strong></div>
+        <div>Münzen <strong id="coins">0</strong></div>
+        <div>Sammelstärke <strong id="power">1</strong></div>
+      </div>
+      <div class="game-buttons">
+        <button type="button" id="collect">Stern sammeln</button>
+        <button type="button" id="upgrade">Stärke verbessern</button>
+      </div>
+      <p id="message" role="status">Bereit.</p>
+    </section>
+  </main>
+</body>
+</html>
