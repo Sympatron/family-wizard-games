@@ -130,3 +130,26 @@ test('mastery tiers have distinct sizes, fill colors and outlines', () => {
     assert.equal(new Set(MASTERY_APPEARANCE.map(tier => tier.border)).size, 3);
     assert.equal(new Set(MASTERY_APPEARANCE.map(tier => tier.label)).size, 3);
 });
+
+test('tier captions render above other dinosaur sprites and follow moving units', () => {
+    const makeNode = (x = 0, y = 0) => ({
+        x, y, depth: 0, children: [],
+        setDepth(depth) {this.depth = depth; return this;},
+        setOrigin() {return this;}, setStrokeStyle() {return this;}, setDisplaySize() {return this;},
+        add(children) {this.children.push(...children); return this;},
+        setPosition(nextX, nextY) {this.x = nextX; this.y = nextY; return this;}
+    });
+    const scene = {add: {
+        container: (x, y) => makeNode(x, y), ellipse: makeNode, image: makeNode,
+        text: makeNode, rectangle: makeNode
+    }};
+    const view = Object.create(BattleView.prototype);
+    Object.assign(view, {scene, units: new Map(), mode: 'formation', destroyed: false, playback: null});
+    const entry = view.createUnit({id: 'd1', team: 'player', species: 'raptor', level: 3, x: 220, y: 410});
+    assert.ok(entry.mastery.depth > entry.container.depth);
+    assert.ok(!entry.container.children.includes(entry.mastery), 'label must not be covered by overlapping sprite containers');
+    entry.container.setPosition(280, 370);
+    view.update(16);
+    assert.equal(entry.mastery.x, 280);
+    assert.equal(entry.mastery.y, 327);
+});
