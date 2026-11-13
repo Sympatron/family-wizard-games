@@ -190,7 +190,8 @@ export class BattleView {
             const unit = (team === 'enemy' ? this.enemies : pool).find(candidate => candidate.id === id);
             const incompatible = source && (team === 'enemy' || (id !== source.id && getMergeChoices(source, unit).length === 0));
             entry.container.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
-            entry.sprite?.setTint(incompatible ? 0x777777 : 0xffffff);
+            if (source || entry.dragDimmed) entry.sprite?.setTint(incompatible ? 0x777777 : 0xffffff);
+            entry.dragDimmed = !!incompatible;
             entry.mastery?.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
         }
     }
