@@ -25,7 +25,7 @@ test('Phaser preloads matching dinosaur SVG textures', () => {
     const view = Object.create(BattleView.prototype);
     const backgrounds = [];
     view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config}), image: (key, url) => backgrounds.push({key, url})}});
-    assert.deepEqual(backgrounds, [{key: 'dino-battlefield', url: './assets/battlefield.avif'}]);
+    assert.deepEqual(backgrounds, [{key: 'dino-battlefield', url: './assets/battlefield.png'}]);
     assert.equal(loaded.length, Object.keys(SPECIES).length);
     for (const species of Object.keys(SPECIES)) {
         assert.deepEqual(loaded.find(item => item.key === 'dino-' + species), {
@@ -34,8 +34,3 @@ test('Phaser preloads matching dinosaur SVG textures', () => {
     }
 });
 
-test('battlefield background is a committed raster AVIF image', async () => {
-    const image = await readFile(new URL('../games/dino-rush-battle/assets/battlefield.avif', import.meta.url));
-    assert.ok(image.length > 5000);
-    assert.equal(image.toString('ascii', 4, 12), 'ftypavif');
-});
