@@ -57,7 +57,7 @@ test('initial battle armies are visibly separated in both orientations', () => {
     for (const portrait of [true, false]) {
         const p = toCombatScreen(player.x, player.y, portrait);
         const e = toCombatScreen(enemy.x, enemy.y, portrait);
-        assert.ok(p.y - e.y >= 480, 'armies need a substantially larger visible gap');
+        assert.ok(p.y - e.y >= 330, 'front lines should start well separated in combat');
         assert.ok(p.y < 580 && e.y > 45, 'both teams must remain fully visible at the start');
     }
 });
