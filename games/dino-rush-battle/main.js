@@ -61,11 +61,13 @@ function chooseEvolution(ids, choices) {
     const title = document.createElement('h3');
     title.textContent = 'Dinosaurier fusionieren';
     const description = document.createElement('p');
-    description.textContent = 'Wähle die Entwicklung für deine beiden gleichen Dinos:';
+    description.textContent = choices.length === 1 ? 'Zwei gleiche Dinos werden zum nächsten Tier fusioniert.' : 'Wähle die nächste Art für zwei gleiche Tier-III-Dinos:';
     const buttons = document.createElement('div');
     buttons.className = 'dino-merge-options';
     for (const species of choices) {
-        addButton(buttons, SPECIES[species].name, () => {
+        const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
+        const label = source?.species === species ? SPECIES[species].name + ' · Tier ' + (source.level + 1) : SPECIES[species].name + ' · Tier I';
+        addButton(buttons, label, () => {
             mergeDialog.close();
             void execute('merge', {ids, into: species});
         });
@@ -78,8 +80,10 @@ function dropDinosaur(id, target) {
     if (activePhase !== 'formation') return;
     const result = resolveFormationDrop(state?.game.run, id, target);
     if (!result) return;
-    if (result.type === 'merge-choice') chooseEvolution(result.ids, result.choices);
-    else void execute(result.type, result.payload);
+    if (result.type === 'merge-choice') {
+        if (result.choices.length === 1) void execute('merge', {ids: result.ids, into: result.choices[0]});
+        else chooseEvolution(result.ids, result.choices);
+    } else void execute(result.type, result.payload);
 }
 function enableUnitDragging(button, id) {
     button.draggable = true;
@@ -173,6 +177,48 @@ function cleanup() {
     activeView = null;
     host.replaceChildren();
 }
+function showEvolutionTree() {
+    if (mergeDialog.open) mergeDialog.close();
+    mergeDialog.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = 'Dinosaurier-Entwicklungsbaum';
+    const info = document.createElement('p');
+    info.textContent = '2 gleiche Dinos → nächstes Tier (I → II → III). Zwei Tier-III-Dinos wählen eine neue Art auf Tier I.';
+    const content = document.createElement('div');
+    content.className = 'dino-tree';
+    for (let rank = 1; rank <= 4; rank++) {
+        const section = document.createElement('section');
+        const heading = document.createElement('h4');
+        heading.textContent = 'Rang ' + ['I', 'II', 'III', 'IV'][rank - 1];
+        section.append(heading);
+        const cards = document.createElement('div');
+        cards.className = 'dino-tree-rank';
+        for (const [species, def] of Object.entries(SPECIES)) {
+            if (def.rank !== rank) continue;
+            const card = document.createElement('article');
+            card.className = 'dino-tree-species';
+            const image = document.createElement('img');
+            image.src = './assets/dinos/' + species + '.svg';
+            image.alt = def.name;
+            image.width = 72;
+            image.height = 56;
+            const label = document.createElement('strong');
+            label.textContent = def.name;
+            const role = document.createElement('small');
+            role.textContent = def.role + (def.evolutions.length ? ' → ' + def.evolutions.map(id => SPECIES[id].name).join(' / ') : ' · Apex');
+            card.append(image, label, role);
+            cards.append(card);
+        }
+        section.append(cards);
+        content.append(section);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Schließen';
+    close.addEventListener('click', () => mergeDialog.close());
+    mergeDialog.append(title, info, content, close);
+    mergeDialog.showModal();
+}
 function renderFormationStats(unit, run) {
     hud.replaceChildren();
     if (!unit) {
@@ -197,7 +243,7 @@ function renderFormationStats(unit, run) {
     avatar.width = 56;
     avatar.height = 46;
     const identity = make('div', 'dino-stat-identity');
-    identity.append(make('strong', '', type.name), make('small', '', 'Level ' + unit.level + ' · ' + type.role));
+    identity.append(make('strong', '', type.name), make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
     const health = make('div', 'dino-stat-health');
     health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
@@ -224,13 +270,13 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
     renderFormationStats(all.find(item => item.id === selected), run);
-    help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
+    help.textContent = 'Zwei gleiche Dinos derselben Tierstufe fusionieren. Tier III ermöglicht eine Artentwicklung.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
     for (const unit of all) {
         const species = SPECIES[unit.species];
-        const text = species.name + ' L' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
+        const text = species.name + ' R' + species.rank + ' T' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
         const button = addButton(picker, text, () => {
             selected = unit.id;
             formation();
@@ -242,12 +288,18 @@ function formation() {
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
+    addButton(row, 'Entwicklungsbaum', showEvolutionTree);
     if (run.army.some(unit => unit.id === selected)) {
         addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
     }
     const merge = mergeOptions(all);
     for (const option of merge) {
-        addButton(row, SPECIES[option.species].name + ' fusionieren', () => chooseEvolution(option.ids, option.choices));
+        const tier = all.find(unit => unit.id === option.ids[0])?.level ?? 1;
+        const label = SPECIES[option.species].name + (tier === 3 ? ' entwickeln' : ' Tier ' + (tier + 1));
+        addButton(row, label, () => {
+            if (option.choices.length === 1) void execute('merge', {ids: option.ids, into: option.choices[0]});
+            else chooseEvolution(option.ids, option.choices);
+        });
     }
     actions.append(row);
 }
