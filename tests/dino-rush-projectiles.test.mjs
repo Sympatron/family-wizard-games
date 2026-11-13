@@ -29,3 +29,17 @@ test('melee-only battle does not spawn ranged projectiles', () => {
     const result = simulateBattle([dino('a', 'raptor', 0)], [dino('e', 'raptor', 0)]);
     assert.equal(result.frames.flatMap(frame => frame.shots ?? []).length, 0);
 });
+
+test('the wider opening gap increases actual approach travel instead of only scaling the display', () => {
+    const result = simulateBattle([dino('a', 'raptor', 0)], [dino('e', 'raptor', 0)]);
+    const [start, ...later] = result.frames;
+    const player = start.find(unit => unit.team === 'player');
+    const enemy = start.find(unit => unit.team === 'enemy');
+    assert.equal(enemy.x - player.x, 800);
+    const afterTwoSeconds = later[9];
+    const playerLater = afterTwoSeconds.find(unit => unit.team === 'player');
+    const enemyLater = afterTwoSeconds.find(unit => unit.team === 'enemy');
+    assert.ok(enemyLater.x - playerLater.x > 500, 'dinosaurs should still be approaching after nearly two seconds');
+    assert.equal(playerLater.hp, player.hp);
+    assert.equal(enemyLater.hp, enemy.hp);
+});
