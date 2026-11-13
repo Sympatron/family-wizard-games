@@ -1,5 +1,5 @@
 import {SPECIES, maxHp} from '../core/game.js';
-import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
+import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
 
 const Phaser = window.Phaser;
@@ -98,7 +98,7 @@ export class BattleView {
         this.render();
     }
 
-    toScreen(x, y) { return toBattleScreen(x, y, this.portrait); }
+    toScreen(x, y) { return toCombatScreen(x, y, this.portrait); }
     cellCenter(team, cell) { return battleCellCenter(team, cell, this.portrait); }
     cellAt(x, y) { return battleCellAt(x, y, this.portrait); }
     get reservePageSize() { return this.portrait ? 7 : 13; }
