@@ -107,11 +107,15 @@ test('dropping a deployed dinosaur into empty reserve space works with mouse and
     }
 });
 
-test('clicking selects a unit and clicking an empty formation cell places the selection', () => {
-    const {view, events, send} = createView(false, {army: [unit('d1', 'raptor', 0)]});
-    send('pointerdown', view.cellCenter('player', 0));
-    send('pointerup', view.cellCenter('player', 0));
-    send('pointerdown', view.cellCenter('player', 3));
-    send('pointerup', view.cellCenter('player', 3));
-    assert.deepEqual(events, [{type: 'select', id: 'd1'}, {type: 'cell', cell: 3}]);
+test('mouse clicks and short touch taps can inspect units but never move or merge them', () => {
+    for (const pointerType of ['mouse', 'touch']) {
+        const {view, events, send} = createView(false, {army: [unit('d1', 'raptor', 0), unit('d2', 'raptor', 3)]});
+        send('pointerdown', view.cellCenter('player', 0), 7, pointerType);
+        send('pointerup', view.cellCenter('player', 0), 7, pointerType);
+        send('pointerdown', view.cellCenter('player', 3), 7, pointerType);
+        send('pointerup', view.cellCenter('player', 3), 7, pointerType);
+        send('pointerdown', view.cellCenter('player', 6), 7, pointerType);
+        send('pointerup', view.cellCenter('player', 6), 7, pointerType);
+        assert.deepEqual(events, [{type: 'select', id: 'd1'}, {type: 'select', id: 'd2'}]);
+    }
 });
