@@ -183,8 +183,9 @@ export class BattleView {
     }
 
     updateDragCompatibility() {
+        if (this.mode !== 'formation') return;
         const pool = [...this.army, ...this.inventory];
-        const source = this.mode === 'formation' && this.drag?.moved ? pool.find(unit => unit.id === this.drag.id) : null;
+        const source = this.mode === 'formation' && this.drag?.id ? pool.find(unit => unit.id === this.drag.id) : null;
         for (const [key, entry] of this.units) {
             const [team, id] = key.split(':');
             const unit = (team === 'enemy' ? this.enemies : pool).find(candidate => candidate.id === id);
@@ -209,6 +210,7 @@ export class BattleView {
         }
         const id = this.unitAtPoint(point.x, point.y);
         this.drag = {id, pointerId: event.pointerId, start: point, moved: false};
+        if (id) this.updateDragCompatibility();
         this.canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
     }
