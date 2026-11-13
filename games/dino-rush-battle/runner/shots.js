@@ -1,8 +1,8 @@
 import {BASE_PICKUP_RANGE} from './coins.js';
 export const MAX_BULLETS = 5;
 export const SHOT_INTERVAL_SECONDS = 0.28;
-export function volleyPattern(count, totalDamage) {
-    if (!Number.isInteger(count) || count < 1 || count > MAX_BULLETS || !(totalDamage > 0) || !Number.isFinite(totalDamage)) {
+export function volleyPattern(count, damagePerBullet) {
+    if (!Number.isInteger(count) || count < 1 || count > MAX_BULLETS || !(damagePerBullet > 0) || !Number.isFinite(damagePerBullet)) {
         throw new Error('Ungültige Schusswerte.');
     }
     return Array.from({length: count}, (_, index) => {
@@ -10,7 +10,7 @@ export function volleyPattern(count, totalDamage) {
         return {
             offset: offset * 0.26,
             spread: offset * 0.022,
-            damage: totalDamage / count
+            damage: damagePerBullet
         };
     });
 }
