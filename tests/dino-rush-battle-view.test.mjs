@@ -9,6 +9,11 @@ const makeElement = () => {
     for (const method of ['setDepth', 'setDisplaySize', 'setStrokeStyle', 'fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect', 'setOrigin', 'setVisible', 'setText', 'clear']) {
         object[method] = () => object;
     }
+    object.setScale = scale => {object.scale = scale; return object;};
+    object.setMask = mask => {object.mask = mask; return object;};
+    object.fillRect = (x, y, width, height) => {object.fillBounds = {x, y, width, height}; return object;};
+    object.createGeometryMask = () => ({geometry: object});
+    object.destroy = () => {object.destroyed = true;};
     object.setPosition = (x, y) => { object.x = x; object.y = y; return object; };
     object.setAlpha = alpha => {object.alpha = alpha; return object;};
     object.setTint = tint => {object.tint = tint; return object;};
@@ -31,7 +36,12 @@ const createView = (portrait = false, {army = [], inventory = []} = {}) => {
     };
     const scene = {
         game: {canvas},
-        add: {graphics: makeElement, rectangle: makeElement, text: makeElement, image: makeElement}
+        make: {graphics: makeElement},
+        add: {
+            graphics: makeElement, rectangle: (x, y, width, height, fillColor, alpha) =>
+                Object.assign(makeElement(), {x, y, width, height, fillColor, alpha}),
+            text: makeElement, image: (x, y) => Object.assign(makeElement(), {x, y, width: 1561, height: 1008})
+        }
     };
     const events = [];
     const view = Object.create(BattleView.prototype);
@@ -233,4 +243,37 @@ test('battle rendering hides the colored tier auras and selection ellipses', () 
     assert.equal(entry.aura.visible, false);
     assert.equal(entry.selection.visible, false);
     assert.equal(entry.container.alpha, 1, 'living dinos remain opaque during combat');
+});
+
+test('planning image is cropped to the battlefield while the reserve has an opaque separate background', () => {
+    for (const portrait of [false, true]) {
+        const {view} = createView(portrait);
+        const fieldWidth = portrait ? 416 : 768;
+        const canvasWidth = portrait ? 540 : 960;
+        const backdrop = view.planningBackground;
+        assert.equal(backdrop.x, fieldWidth / 2);
+        assert.equal(backdrop.y, 310);
+        assert.deepEqual(view.planningMask.fillBounds, {x: 0, y: 0, width: fieldWidth, height: 620});
+        assert.equal(backdrop.mask.geometry, view.planningMask);
+        assert.ok(backdrop.width * backdrop.scale >= fieldWidth);
+        assert.ok(backdrop.height * backdrop.scale >= 620);
+        assert.equal(backdrop.width / backdrop.height, 1561 / 1008);
+        assert.ok(view.battlefield.width * view.battlefield.scale >= canvasWidth);
+        assert.equal(view.reserveBackground.x, (fieldWidth + canvasWidth) / 2);
+        assert.equal(view.reserveBackground.width, canvasWidth - fieldWidth);
+        assert.equal(view.reserveBackground.height, 620);
+        assert.equal(view.reserveBackground.alpha, 1);
+        BattleView.prototype.render.call(view);
+        assert.equal(view.battlefield.visible, false);
+        assert.equal(backdrop.visible, true);
+        assert.equal(view.reserveBackground.visible, true);
+        view.mode = 'battle';
+        view.playback = {frames: [[]], index: 0};
+        BattleView.prototype.render.call(view);
+        assert.equal(view.battlefield.visible, true);
+        assert.equal(backdrop.visible, false);
+        assert.equal(view.reserveBackground.visible, false);
+        view.planningMask.destroy();
+        assert.equal(view.planningMask.destroyed, true);
+    }
 });
