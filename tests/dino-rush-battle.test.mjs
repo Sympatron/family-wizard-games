@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, reduceGame} from '../games/dino-rush-battle/core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, reduceGame, migrateGame, maxHp} from '../games/dino-rush-battle/core/game.js';
+import {healingCost, gunUpgradeCost} from '../games/dino-rush-battle/core/shop.js';
+import {initialRunnerWeaponStats} from '../games/dino-rush-battle/runner/shots.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
 import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen, clientPointToCell} from '../games/dino-rush-battle/core/board-layout.js';
 
@@ -27,13 +29,17 @@ test('runner collection, formation, branch evolution and battle reward form a st
     assert.equal(game.run.phase, 'rewards');
     assert.equal(game.run.money, 35);
     assert.ok(game.run.army.every(unit => unit.hp >= 25));
-    game = apply(game, 'buy-potion');
-    assert.equal(game.run.money, 15);
-    assert.equal(game.run.potions, 1);
+    const injured = game.run.army.find(unit => unit.hp < maxHp(unit, game.meta.upgrades));
+    const cost = healingCost(injured.hp, maxHp(injured, game.meta.upgrades));
+    game = apply(game, 'heal', {id: injured.id});
+    assert.equal(game.run.money, 35 - cost);
+    assert.equal(game.run.army.find(unit => unit.id === injured.id).hp, maxHp(injured, game.meta.upgrades));
+    assert.throws(() => apply(game, 'buy-potion'), /Unbekannte Spielaktion/);
     assert.throws(() => apply(game, 'buy-battle-damage'), /Nicht genug Geld/);
     game = apply(game, 'next-stage');
     assert.equal(game.run.stage, 2);
     assert.equal(game.run.battleUpgrades.damage, 0);
+    assert.deepEqual(game.run.gunUpgrades, {damage: 0, fireRate: 0, bullets: 0});
     assert.equal(game.run.phase, 'runner');
 });
 test('loss resets temporary progress and awards persistent meta currency', () => {
@@ -193,7 +199,7 @@ test('touch and mouse positions map to correct formation cell in scaled canvases
 });
 test('runner upgrades are bounded to prevent runaway cage damage', () => {
     const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
-    assert.deepEqual(game.run.temporary, {damage: 3, fireRate: 2.5, bullets: 5});
+    assert.deepEqual(game.run.temporary, {damage: 6, fireRate: 6, bullets: 5, pickupRange: 1.8});
 });
 
 test('equal species merge to the next mastery tier before branching', () => {
@@ -231,4 +237,18 @@ test('rare cages rescue evolved species and reinforced cages rescue Tier II', ()
     assert.equal(game.run.army.find(unit => unit.species === 'triceratops').level, 2);
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'tyrannosaurus', level: 1}]}));
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'raptor', level: 4}]}));
+});
+
+test('temporary magnet radius is saved for the stage and resets next stage', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: [], temporary: {pickupRange: 6}});
+    assert.equal(game.run.temporary.pickupRange, 6);
+    game = apply(game, 'start-battle');
+    game = apply(game, 'resolve-battle', {winner: 'player', survivors: game.run.army.map(unit => ({id: unit.id, hp: unit.hp}))});
+    game = apply(game, 'next-stage');
+    assert.equal(game.run.temporary.pickupRange, 1.8);
+});
+
+test('runner completion preserves absolute fractional stats and compounded positive upgrades', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 8.4, fireRate: 5.7, bullets: 3, pickupRange: 7.1}});
+    assert.deepEqual(game.run.temporary, {damage: 8.4, fireRate: 5.7, bullets: 3, pickupRange: 7.1});
 });

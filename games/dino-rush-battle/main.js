@@ -1,11 +1,15 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
 import {BattleView} from './battle/view.js';
+import {createRunnerHud} from './runner/hud.js';
+import {initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS, MAX_BULLETS} from './runner/shots.js';
+import {GUN_UPGRADES, gunUpgradeCost, healingCost} from './core/shop.js';
+import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
 const stage = document.querySelector('.dino-stage');
@@ -64,15 +68,18 @@ function chooseEvolution(ids, choices) {
     description.textContent = choices.length === 1 ? 'Zwei gleiche Dinos werden zum nächsten Tier fusioniert.' : 'Wähle die nächste Art für zwei gleiche Tier-III-Dinos:';
     const buttons = document.createElement('div');
     buttons.className = 'dino-merge-options';
+    const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
     for (const species of choices) {
-        const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
-        const label = source?.species === species ? SPECIES[species].name + ' · Tier ' + (source.level + 1) : SPECIES[species].name + ' · Tier I';
-        addButton(buttons, label, () => {
+        const level = source?.species === species ? source.level + 1 : 1;
+        const button = createEvolutionChoiceButton(document, species, level, state.game.meta.upgrades, state.game.run.battleUpgrades);
+        button.addEventListener('click', () => {
             mergeDialog.close();
             void execute('merge', {ids, into: species});
         });
+        buttons.append(button);
     }
-    addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    const cancel = addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    cancel.className = 'dino-merge-cancel';
     mergeDialog.append(title, description, buttons);
     mergeDialog.showModal();
 }
@@ -85,69 +92,6 @@ function dropDinosaur(id, target) {
         else chooseEvolution(result.ids, result.choices);
     } else void execute(result.type, result.payload);
 }
-function enableUnitDragging(button, id) {
-    button.draggable = true;
-    button.addEventListener('dragstart', event => {
-        if (activePhase !== 'formation') return event.preventDefault();
-        event.dataTransfer.setData('text/plain', id);
-        event.dataTransfer.effectAllowed = 'move';
-        selected = id;
-    });
-    button.addEventListener('pointerdown', event => {
-        if (!['touch', 'pen'].includes(event.pointerType) || activePhase !== 'formation') return;
-        const {pointerId, clientX: startX, clientY: startY} = event;
-        let dragging = false;
-        let ghost = null;
-        function move(next) {
-            if (next.pointerId !== pointerId) return;
-            if (!dragging && Math.hypot(next.clientX - startX, next.clientY - startY) < 12) return;
-            if (!dragging) {
-                dragging = true;
-                selected = id;
-                ghost = document.createElement('div');
-                ghost.className = 'dino-drag-ghost';
-                ghost.textContent = button.textContent;
-                document.body.append(ghost);
-            }
-            next.preventDefault();
-            ghost.style.left = next.clientX + 'px';
-            ghost.style.top = next.clientY + 'px';
-            activeView?.highlightClient(next.clientX, next.clientY, id);
-        }
-        function cleanup(next, cancelled) {
-            if (next.pointerId !== pointerId) return;
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            window.removeEventListener('pointercancel', cancel);
-            ghost?.remove();
-            const target = !cancelled && dragging ? activeView?.targetAtClient(next.clientX, next.clientY, id) : null;
-            activeView?.showDropTarget(null);
-            if (target && activePhase === 'formation') dropDinosaur(id, target);
-        }
-        function up(next) { cleanup(next, false); }
-        function cancel(next) { cleanup(next, true); }
-        window.addEventListener('pointermove', move, {passive: false});
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', cancel);
-    });
-}
-host.addEventListener('dragover', event => {
-    if (activePhase !== 'formation') return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    activeView?.highlightClient(event.clientX, event.clientY);
-});
-host.addEventListener('dragleave', event => {
-    if (!host.contains(event.relatedTarget)) activeView?.showDropTarget(null);
-});
-host.addEventListener('drop', event => {
-    if (activePhase !== 'formation') return;
-    event.preventDefault();
-    const id = event.dataTransfer.getData('text/plain');
-    const target = activeView?.targetAtClient(event.clientX, event.clientY, id);
-    activeView?.showDropTarget(null);
-    if (id && target) dropDinosaur(id, target);
-});
 function paragraph(parent, text) {
     const element = document.createElement('div');
     element.textContent = text;
@@ -275,37 +219,12 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
     renderFormationStats(all.find(item => item.id === selected), run);
-    help.textContent = 'Zwei gleiche Dinos derselben Tierstufe fusionieren. Tier III ermöglicht eine Artentwicklung.';
+    help.textContent = 'Dinos per Drag & Drop auf Felder oder in den Vorrat ziehen. Zwei gleiche Dinos zum Fusionieren aufeinanderziehen.';
     actions.replaceChildren();
-    const picker = document.createElement('div');
-    picker.className = 'unit-picker';
-    for (const unit of all) {
-        const species = SPECIES[unit.species];
-        const text = species.name + ' R' + species.rank + ' T' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
-        const button = addButton(picker, text, () => {
-            selected = unit.id;
-            formation();
-        }, {selected: unit.id === selected});
-        enableUnitDragging(button, unit.id);
-    }
-    actions.append(picker);
     const row = document.createElement('div');
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
-    addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
     addButton(row, 'Entwicklungsbaum', showEvolutionTree);
-    if (run.army.some(unit => unit.id === selected)) {
-        addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
-    }
-    const merge = mergeOptions(all);
-    for (const option of merge) {
-        const tier = all.find(unit => unit.id === option.ids[0])?.level ?? 1;
-        const label = SPECIES[option.species].name + (tier === 3 ? ' entwickeln' : ' Tier ' + (tier + 1));
-        addButton(row, label, () => {
-            if (option.choices.length === 1) void execute('merge', {ids: option.ids, into: option.choices[0]});
-            else chooseEvolution(option.ids, option.choices);
-        });
-    }
     actions.append(row);
 }
 function beginBattle() {
@@ -320,21 +239,76 @@ function beginBattle() {
 function rewards() {
     const run = state.game.run;
     heading.textContent = 'Sieg! Stufe ' + run.stage + ' geschafft';
-    hud.textContent = '+' + run.lastResult.money + ' Münzen · ' + run.potions + ' Heiltränke';
-    help.textContent = 'Verletzte Dinos behalten ihren Schaden. Überlebende haben sich bereits etwas erholt.';
+    hud.textContent = '+' + run.lastResult.money + ' Münzen · Guthaben: ' + run.money + ' Münzen';
+    help.textContent = 'Waffenupgrades bleiben für diesen Durchlauf erhalten. Verletzte Dinos können einzeln geheilt werden.';
     actions.replaceChildren();
-    paragraph(actions, 'Heiltränke kosten 20 Münzen und heilen 60 % der maximalen Lebenspunkte. Auch bewusstlose Dinos können damit wiederbelebt werden.');
+
+    const gunSection = document.createElement('section');
+    gunSection.className = 'dino-shop-section';
+    const gunTitle = document.createElement('h3');
+    gunTitle.textContent = 'Runner-Waffe verbessern';
+    const gunRow = document.createElement('div');
+    gunRow.className = 'dino-shop-gun-grid';
+    const base = initialRunnerWeaponStats(state.game.meta.upgrades, run.gunUpgrades);
+    for (const [kind, config] of Object.entries(GUN_UPGRADES)) {
+        const level = run.gunUpgrades[kind];
+        const maxed = config.maxLevel !== undefined && level >= config.maxLevel;
+        const cost = maxed ? null : gunUpgradeCost(kind, level);
+        const current = kind === 'damage' ? base.damage.toFixed(1) + ' Schaden/Kugel'
+            : kind === 'fireRate' ? (base.fireRate / SHOT_INTERVAL_SECONDS).toFixed(1) + ' Serien/s'
+            : base.bullets + '/' + MAX_BULLETS + ' Kugeln';
+        const button = addButton(gunRow, config.label + ' · ' + current + ' · ' + config.increase +
+            (maxed ? ' · MAX' : ' · ' + cost + ' Münzen'), () => void execute('buy-gun-upgrade', {kind}),
+        {disabled: maxed || run.money < cost});
+        button.classList.add('dino-shop-gun-upgrade');
+    }
+    gunSection.append(gunTitle, gunRow);
+    actions.append(gunSection);
+
+    const healSection = document.createElement('section');
+    healSection.className = 'dino-shop-section';
+    const healTitle = document.createElement('h3');
+    healTitle.textContent = 'Dinos heilen';
+    const healList = document.createElement('div');
+    healList.className = 'dino-heal-list';
+    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));
+    if (!injured.length) paragraph(healList, 'Alle Dinos sind gesund.');
+    for (const unit of injured) {
+        const maximum = maxHp(unit, state.game.meta.upgrades);
+        const cost = healingCost(unit.hp, maximum);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dino-heal-card';
+        button.disabled = run.money < cost;
+        const image = document.createElement('img');
+        image.src = './assets/dinos/' + unit.species + '.svg';
+        image.alt = SPECIES[unit.species].name;
+        image.width = 80;
+        image.height = 64;
+        const details = document.createElement('span');
+        details.className = 'dino-heal-details';
+        const name = document.createElement('strong');
+        name.textContent = SPECIES[unit.species].name + ' · Tier ' + unit.level;
+        const health = document.createElement('span');
+        health.textContent = 'Leben ' + unit.hp + '/' + maximum + ' · +' + (maximum - unit.hp) + ' LP';
+        const price = document.createElement('strong');
+        price.className = 'dino-heal-price';
+        price.textContent = 'Vollständig heilen · ' + cost + ' Münzen';
+        details.append(name, health, price);
+        button.append(image, details);
+        button.addEventListener('click', () => void execute('heal', {id: unit.id}));
+        healList.append(button);
+    }
+    healSection.append(healTitle, healList);
+    actions.append(healSection);
+
     const row = document.createElement('div');
     row.className = 'action-row';
-    addButton(row, 'Heiltrank kaufen (20)', () => void execute('buy-potion'), {disabled: run.money < 20});
     const damageCost = 30 + 20 * run.battleUpgrades.damage;
-    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ')', () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
+    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ' Münzen)',
+        () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
     addButton(row, 'Nächste Stufe', () => void execute('next-stage'));
     actions.append(row);
-    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));
-    for (const unit of injured) {
-        addButton(actions, SPECIES[unit.species].name + ' heilen (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')', () => void execute('heal', {id: unit.id}), {disabled: run.potions < 1});
-    }
 }
 function gameOver() {
     const game = state.game;
@@ -364,12 +338,14 @@ async function beginRunner() {
     }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
-    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Triff Käfige und verbessere Tore durch Schüsse.';
+    const runnerHud = createRunnerHud(document);
+    hud.replaceChildren(runnerHud.root);
+    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Schieße auf Käfige und Tore; Magnet-Tore erhöhen die Münzreichweite.';
     try {
         const {startRunner} = await import('./runner/runner.js');
         if (activePhase !== 'runner' || token !== runnerStartToken) return;
         activeView = startRunner(host, {
-        stage: game.run.stage, upgrades: game.meta.upgrades,
+        stage: game.run.stage, upgrades: game.meta.upgrades, gunUpgrades: game.run.gunUpgrades,
         roster: [...game.run.army, ...game.run.inventory].map(unit => unit.species),
         onPauseChange: paused => {
             if (pauseToggle) {
@@ -380,9 +356,7 @@ async function beginRunner() {
             message.textContent = paused ? 'Pausiert – mit Weiter oder P fortsetzen' : '';
         },
         onProgress: progress => {
-            hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
-                ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets + ' · Münzen ' + (progress.coins ?? 0);
+            runnerHud.update(progress);
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
@@ -411,6 +385,7 @@ function apply(snapshot) {
         stage.className = 'dino-stage ' + phase;
         if (pauseToggle) pauseToggle.hidden = phase !== 'runner';
         hud.classList.toggle('dino-stats-panel', phase === 'formation');
+        hud.classList.toggle('dino-runner-hud', phase === 'runner');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
@@ -419,9 +394,8 @@ function apply(snapshot) {
             if (phase === 'runner') void beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
-                    onCell: cell => { if (selected) dropDinosaur(selected, cell); },
                     onSelect: id => { selected = id; formation(); },
-                    onDrop: (id, cell) => { selected = id; dropDinosaur(id, cell); }
+                    onDrop: (id, target) => { selected = id; dropDinosaur(id, target); }
                 });
                 if (phase === 'formation') formation();
                 else beginBattle();

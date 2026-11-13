@@ -4,7 +4,7 @@ import {SPECIES} from '../games/dino-rush-battle/core/game.js';
 import {createRunnerWave, cageHitPoints, RUNNER_SPECIES, ADVANCED_SPECIES, ELITE_SPECIES} from '../games/dino-rush-battle/runner/spawns.js';
 import {volleyPattern} from '../games/dino-rush-battle/runner/shots.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
-import {toBattleScreen} from '../games/dino-rush-battle/core/board-layout.js';
+import {toCombatScreen} from '../games/dino-rush-battle/core/board-layout.js';
 
 function randomGenerator(seed) {
     return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
@@ -37,12 +37,12 @@ test('late rare cages advance progression without rescuing an apex directly', ()
     assert.equal(endgame.level, 3);
     assert.ok(cageHitPoints(46, 'rare') <= 65);
 });
-test('weapon upgrades improve DPS but cannot multiply per-volley damage by bullet count', () => {
+test('each bullet deals the full upgraded damage instead of dividing it among the volley', () => {
     for (const count of [1, 2, 3, 4, 5]) {
-        for (const total of [1, 2, 3]) {
-            const volley = volleyPattern(count, total);
-            assert.ok(Math.abs(volley.reduce((sum, shot) => sum + shot.damage, 0) - total) < 1e-10);
-            assert.ok(volley.every(shot => shot.damage <= total));
+        for (const perBullet of [1, 2.2, 4.4]) {
+            const volley = volleyPattern(count, perBullet);
+            assert.ok(Math.abs(volley.reduce((sum, shot) => sum + shot.damage, 0) - perBullet * count) < 1e-10);
+            assert.ok(volley.every(shot => shot.damage === perBullet));
         }
     }
     assert.ok(cageHitPoints(15, 'common') > cageHitPoints(1, 'common'));
@@ -55,9 +55,9 @@ test('initial battle armies are visibly separated in both orientations', () => {
     const enemy = frame.find(unit => unit.team === 'enemy');
     assert.ok(enemy.x - player.x >= 450);
     for (const portrait of [true, false]) {
-        const p = toBattleScreen(player.x, player.y, portrait);
-        const e = toBattleScreen(enemy.x, enemy.y, portrait);
-        assert.ok(p.y - e.y > 370, 'armies need a substantial visible distance');
-        assert.ok(p.y < 620 && e.y > 0);
+        const p = toCombatScreen(player.x, player.y, portrait);
+        const e = toCombatScreen(enemy.x, enemy.y, portrait);
+        assert.ok(p.y - e.y >= 330, 'front lines should start well separated in combat');
+        assert.ok(p.y < 580 && e.y > 45, 'both teams must remain fully visible at the start');
     }
 });

@@ -11,7 +11,6 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.formation #game-view canvas,.dino-stage.battle #game-view canvas {width:auto;height:auto;max-width:100%;max-height:100%;margin:auto;}
 .dino-stage.runner {height:calc(100dvh - 108px);min-height:420px;}
 .dino-stage.runner #game-view {height:100%;}
-.dino-stage.formation #actions .unit-picker button {touch-action:none;}
 .dino-stage.formation,.dino-stage.battle {min-height:620px;}
 .dino-stage.formation #game-view,.dino-stage.battle #game-view {height:620px;}
 #overlay {pointer-events:none;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;}
@@ -27,10 +26,6 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-stage.formation #overlay {position:relative;inset:auto;background:#102a3e;gap:6px;}
 .dino-stage.formation #actions {background:#102a3eed;border-radius:15px;margin-top:0;margin-bottom:8px;max-height:none;overflow:visible;}
 .dino-stage.formation #message {margin-top:0;margin-bottom:6px;}
-#actions .unit-picker {display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:100%;}
-#actions .unit-picker button {font-size:.8rem;padding:8px;cursor:grab;}
-#actions .unit-picker button:active {cursor:grabbing;}
-.dino-drag-ghost {position:fixed;z-index:250;transform:translate(-50%,-100%);pointer-events:none;padding:8px 12px;border-radius:10px;background:#f0ca7c;color:#142734;box-shadow:0 8px 20px #0009;font-size:.85rem;font-weight:700;white-space:nowrap;}
 #actions .action-row {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;}
 .dino-stage.rewards #game-view,.dino-stage.gameover #game-view {display:none;}
 .dino-stage.rewards #overlay,.dino-stage.gameover #overlay {position:relative;min-height:560px;justify-content:center;gap:14px;}
@@ -50,7 +45,7 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stage.formation #hud {padding:1px 3px;font-size:.73rem;}
   .dino-stage.formation #actions {display:flex;flex-direction:column;align-items:stretch;flex-wrap:nowrap;gap:5px;padding:5px;margin:0;max-height:none;overflow:visible;}
   .dino-stage.formation #message {font-size:.72rem;margin:0 0 3px;}
-  .dino-stage.formation #actions .unit-picker,.dino-stage.formation #actions .action-row {display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;width:100%;overflow-x:auto;scrollbar-width:thin;}
+  .dino-stage.formation #actions .action-row {display:flex;flex-wrap:nowrap;justify-content:flex-start;gap:5px;width:100%;overflow-x:auto;scrollbar-width:thin;}
   .dino-stage.formation #actions button {flex:0 0 auto;white-space:nowrap;padding:7px;font-size:.74rem;}
   .dino-stage.battle #heading,.dino-stage.battle #hud {display:none;}
   .dino-stage.runner #heading {font-size:1.05rem;padding:4px;}
@@ -67,6 +62,15 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-merge-dialog p {margin:0 0 18px;color:#b4d6d9;}
 .dino-merge-options {display:flex;flex-direction:column;gap:8px;}
 .dino-merge-options button {background:#f0ca7c;color:#142734;border:0;padding:12px;border-radius:10px;font-weight:700;}
+.dino-merge-dialog:has(.dino-merge-choice) {width:min(540px,calc(100vw - 24px));overflow-y:auto;}
+.dino-merge-options .dino-merge-choice {display:grid;grid-template-columns:100px minmax(0,1fr);align-items:center;gap:10px;width:100%;padding:9px;text-align:left;background:#27424d;color:#f1f7f2;border:2px solid var(--dino-color);}
+.dino-merge-choice img {width:96px;height:76px;object-fit:contain;border-radius:8px;background:#1c333c;}
+.dino-merge-details {display:flex;flex-direction:column;gap:5px;min-width:0;}
+.dino-merge-details strong {font-size:1.05rem;color:#ffffff;}
+.dino-merge-role {font-size:.82rem;color:#c5ecdf;}
+.dino-merge-stats {font-size:.8rem;color:#f4db9f;}
+.dino-merge-options .dino-merge-choice:focus-visible {outline:3px solid #fff0ad;outline-offset:2px;}
+@media(max-width:450px) {.dino-merge-options .dino-merge-choice {grid-template-columns:70px minmax(0,1fr);gap:7px;padding:6px;}.dino-merge-choice img {width:70px;height:64px;}.dino-merge-details strong {font-size:.96rem;}.dino-merge-role,.dino-merge-stats {font-size:.73rem;}}
 
 #hud.dino-stats-panel {display:flex;justify-content:center;padding:5px 8px;text-shadow:none;}
 .dino-stat-card {--dino-color:#8bc9a8;display:grid;grid-template-columns:minmax(160px,1.3fr) minmax(140px,1fr) minmax(240px,1.8fr);align-items:center;gap:12px;width:min(100%,860px);padding:9px 12px;background:#152e3a;border:1px solid #467483;border-left:5px solid var(--dino-color);border-radius:13px;box-shadow:0 3px 14px #0006;text-align:left;}
@@ -122,3 +126,56 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-tree-species strong {font-size:.8rem;overflow-wrap:anywhere;}
 .dino-tree-species small {font-size:.69rem;color:#bed5d7;line-height:1.3;overflow-wrap:anywhere;}
 @media(max-width:550px) {.dino-tree-rank {grid-template-columns:repeat(2,minmax(0,1fr));}}
+
+.dino-gate-guide {position:absolute;top:156px;left:50%;transform:translateX(-50%);z-index:2;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:min(92%,420px);pointer-events:none;}
+.dino-gate-guide[hidden] {display:none;}
+.dino-gate-guide span {display:block;padding:8px 9px;border:2px solid #ffea9e;border-radius:9px;background:#102631ed;color:#fff7d0;font-size:clamp(.78rem,2vw,.98rem);font-weight:900;letter-spacing:.02em;text-align:center;text-shadow:0 2px 2px #000;}
+.dino-gate-guide .positive {border-color:#81f7d3;color:#c0ffe5;}
+.dino-gate-guide .negative {border-color:#ff9387;color:#ffd2ca;}
+@media (max-width:650px) {.dino-gate-guide {top:118px;gap:5px;}.dino-gate-guide span {padding:5px 4px;font-size:.71rem;}}
+
+
+#hud.dino-runner-hud {position:relative;z-index:4;padding:2px 8px;text-shadow:none;}
+.dino-runner-stat-strip {display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;max-width:900px;margin:0 auto;}
+.dino-runner-stat {display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:60px;height:38px;box-sizing:border-box;padding:4px 9px;border:1px solid #6b8790;border-radius:11px;background:linear-gradient(160deg,#294653ee,#142936f5);box-shadow:0 3px 8px #08182188;color:#eff8eb;}
+.dino-runner-stat strong {font-size:clamp(.83rem,1.35vw,1.1rem);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.dino-runner-icon {display:block;width:23px;height:23px;flex:none;}
+.dino-runner-stat-time .dino-runner-icon {color:#cfedf6;}
+.dino-runner-stat-hp .dino-runner-icon {color:#ff9694;}
+.dino-runner-stat-dinos .dino-runner-icon {width:32px;height:27px;object-fit:contain;filter:drop-shadow(0 1px 1px #0008);}
+.dino-runner-stat-damage .dino-runner-icon {color:#ffc48c;}
+.dino-runner-stat-fireRate .dino-runner-icon {color:#ffec8b;}
+.dino-runner-stat-bullets .dino-runner-icon {color:#add8fa;}
+.dino-runner-stat-pickupRange .dino-runner-icon {color:#b69cfa;}
+.dino-runner-stat-coins {border-color:#edbf57;background:linear-gradient(160deg,#71502cd9,#2f302ce9);}
+.dino-runner-stat-coins .dino-runner-icon {color:#f6d779;}
+.dino-stage.runner #message {top:136px;}
+.dino-stage.runner .dino-gate-guide {top:198px;}
+@media(max-width:650px) {
+  .dino-runner-stat-strip {gap:4px;}
+  .dino-runner-stat {height:32px;min-width:58px;padding:3px 6px;gap:4px;border-radius:8px;}
+  .dino-runner-icon {width:19px;height:19px;}
+  .dino-runner-stat strong {font-size:.79rem;}
+  .dino-stage.runner #message {top:125px;}
+  .dino-stage.runner .dino-gate-guide {top:190px;}
+}
+
+.dino-stage.rewards #actions {max-width:980px;gap:16px;}
+.dino-shop-section {width:100%;min-width:0;}
+.dino-shop-section h3 {margin:0 0 10px;font-size:1.05rem;color:#f4dfa0;text-align:left;}
+.dino-shop-gun-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+#actions .dino-shop-gun-upgrade {min-height:74px;padding:12px 9px;line-height:1.45;white-space:normal;background:#315365;color:#f5f5e7;border:1px solid #7ac6b9;}
+.dino-heal-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;}
+#actions .dino-heal-card {display:flex;align-items:center;gap:11px;min-width:0;min-height:104px;padding:11px;background:#25414f;border:1px solid #68a99b;color:#f1f7f2;text-align:left;}
+.dino-heal-card img {width:80px;height:68px;flex:0 0 80px;object-fit:contain;border-radius:9px;background:#19313d;}
+.dino-heal-details {display:flex;min-width:0;flex-direction:column;gap:5px;font-size:.85rem;font-weight:500;}
+.dino-heal-details strong {font-size:.94rem;}
+.dino-heal-price {color:#ffdc8b;}
+#actions .dino-heal-card:focus-visible,#actions .dino-shop-gun-upgrade:focus-visible {outline:3px solid #f9d990;outline-offset:2px;}
+@media (max-width:650px) {
+  .dino-shop-gun-grid {grid-template-columns:1fr;gap:6px;}
+  #actions .dino-shop-gun-upgrade {min-height:48px;padding:8px;}
+  .dino-heal-list {grid-template-columns:1fr;gap:7px;}
+  #actions .dino-heal-card {min-height:78px;padding:7px;}
+  .dino-heal-card img {width:62px;height:52px;flex-basis:62px;}
+}

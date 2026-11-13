@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {COIN_VALUES, makeCoinWave, crossedCoin} from '../games/dino-rush-battle/runner/coins.js';
+import {COIN_VALUES, BASE_PICKUP_RANGE, MAX_PICKUP_RANGE, makeCoinWave, crossedCoin} from '../games/dino-rush-battle/runner/coins.js';
 
 test('runner coins include distinct denominations and varied positions', () => {
     const values = new Set();
@@ -31,4 +31,12 @@ test('coins have a generous collection radius without collecting across the road
     assert.equal(crossedCoin(1.7, 8, 7.6, 8.3, 0), true);
     assert.equal(crossedCoin(-1.7, 8, 7.6, 8.3, 0), true);
     assert.equal(crossedCoin(1.9, 8, 7.6, 8.3, 0), false);
+});
+
+test('gate magnet range collects coins farther away but stays bounded', () => {
+    assert.equal(BASE_PICKUP_RANGE, 1.8);
+    assert.equal(MAX_PICKUP_RANGE, 4.5);
+    assert.equal(crossedCoin(0, 8, 7.7, 8.3, 3), false);
+    assert.equal(crossedCoin(0, 8, 7.7, 8.3, 3, 3.2), true);
+    assert.equal(crossedCoin(0, 8, 7.7, 8.3, 5, MAX_PICKUP_RANGE), false);
 });

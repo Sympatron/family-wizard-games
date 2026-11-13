@@ -25,8 +25,28 @@ export function createHitSound() {
     function hit(kind = 'impact') {
         if (disposed || !soundEnabled || context?.state !== 'running') return;
         const now = context.currentTime;
-        if (now - lastHit < 0.045) return;
+        if (now - lastHit < 0.045 && kind !== 'cage') return;
         lastHit = now;
+        if (kind === 'cage') {
+            for (const [type, from, to, duration, volume] of [
+                ['sawtooth', 380, 65, 0.27, 0.13],
+                ['square', 1400, 210, 0.19, 0.045],
+                ['triangle', 120, 48, 0.32, 0.085]
+            ]) {
+                const oscillator = context.createOscillator();
+                const gain = context.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(from, now);
+                oscillator.frequency.exponentialRampToValueAtTime(to, now + duration * 0.86);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                oscillator.connect(gain);
+                gain.connect(context.destination);
+                oscillator.start(now);
+                oscillator.stop(now + duration + 0.015);
+            }
+            return;
+        }
         const oscillator = context.createOscillator();
         const gain = context.createGain();
         oscillator.type = ['break', 'shot'].includes(kind) ? 'sawtooth' : 'triangle';
