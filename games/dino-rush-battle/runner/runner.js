@@ -16,6 +16,7 @@ import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
 import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
+import {volleyPattern} from './shots.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -42,10 +43,15 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
     }
     function dinosaur(species, color) {
         const result = new THREE.Group();
+        const def = DINOSAURS[species];
         const skin = material(color);
-        const belly = material(0xe9ca9f);
-        const eyes = material(0x192333);
-        const detail = material(0x415569);
+        const dark = material(new THREE.Color(color).multiplyScalar(0.62));
+        const belly = material(0xdcc7a6);
+        const eyes = material(0xf5ae50);
+        const pupil = material(0x13212c);
+        const teeth = material(0xfff0d7);
+        const wings = def.role === 'Fernkampf' && (def.rank > 1 || species === 'pteranodon');
+        const armored = def.role === 'Tank';
         function piece(geometry, mat, x, y, z, sx = 1, sy = 1, sz = 1) {
             const mesh = new THREE.Mesh(geometry, mat);
             mesh.position.set(x, y, z);
@@ -54,39 +60,68 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
             return mesh;
         }
         const sphere = (radius, mat, x, y, z, sx = 1, sy = 1, sz = 1) =>
-            piece(new THREE.SphereGeometry(radius, 10, 8), mat, x, y, z, sx, sy, sz);
-        sphere(0.69, skin, 0, 1.35, 0.1, 1, 0.75, 1.3);
-        sphere(0.48, skin, 0, 1.95, -0.66);
-        sphere(0.39, belly, 0, 1.69, -1.0, 0.9, 0.5, 1.2);
+            piece(new THREE.SphereGeometry(radius, 12, 8), mat, x, y, z, sx, sy, sz);
+        sphere(0.78, skin, 0, 1.28, 0.12, armored ? 1.2 : 1, 0.84, 1.32);
+        sphere(0.52, skin, 0, 1.97, -0.76, 1.12, 0.94, 1);
+        sphere(0.36, belly, 0, 1.73, -1.18, 1.05, 0.36, 1.05);
+        const jaw = sphere(0.39, dark, 0, 1.68, -1.23, 1.13, 0.27, 0.9);
         for (const side of [-1, 1]) {
-            sphere(0.13, eyes, side * 0.36, 2.09, -0.91);
-            const leg = piece(new THREE.CylinderGeometry(0.17, 0.27, 0.95, 7), skin, side * 0.45, 0.55, 0.33);
+            sphere(0.15, dark, side * 0.42, 2.1, -1.1);
+            sphere(0.095, eyes, side * 0.45, 2.14, -1.2);
+            sphere(0.048, pupil, side * 0.47, 2.14, -1.28);
+            const brow = sphere(0.2, dark, side * 0.45, 2.28, -1.12, 1.3, 0.35, 0.85);
+            brow.rotation.z = side * -0.24;
+            const leg = piece(new THREE.CylinderGeometry(0.19, 0.29, 0.98, 7), skin, side * 0.48, 0.55, 0.34);
             (result.userData.legs ??= []).push(leg);
-            sphere(0.23, skin, side * 0.46, 0.13, -0.03, 0.8, 0.45, 1.3);
-            sphere(0.16, skin, side * 0.58, 1.39, -0.78, 0.65, 1.1, 0.65);
+            sphere(0.27, dark, side * 0.5, 0.14, -0.16, 0.8, 0.4, 1.5);
+            for (let claw = 0; claw < 3; claw++) {
+                const nail = piece(new THREE.ConeGeometry(0.055, 0.3, 5), teeth, side * (0.33 + claw * 0.16), 0.07, -0.5);
+                nail.rotation.x = -Math.PI / 2;
+            }
+            sphere(0.19, skin, side * 0.66, 1.42, -0.58, 0.8, 1.2, 0.68);
+            for (let tooth = 0; tooth < 4; tooth++) {
+                const fang = piece(new THREE.ConeGeometry(0.048, 0.19, 5), teeth, side * (0.17 + tooth * 0.1), 1.6, -1.48 + tooth * 0.025);
+                fang.rotation.z = Math.PI;
+            }
         }
-        const tail = piece(new THREE.ConeGeometry(0.42, 2.1, 8), skin, 0, 1.32, 1.36);
+        const tail = piece(new THREE.ConeGeometry(0.44, 2.4, 9), skin, 0, 1.32, 1.55);
         tail.rotation.x = Math.PI / 2;
-        if (species === 'triceratops') {
-            for (const side of [-1, 1]) {
-                const horn = piece(new THREE.ConeGeometry(0.14, 0.75, 7), belly, side * 0.34, 2.35, -1.02);
-                horn.rotation.x = -0.35;
+        if (armored) {
+            for (let i = 0; i < 5; i++) {
+                for (const side of [-1, 1]) {
+                    const plate = piece(new THREE.ConeGeometry(0.22, 0.62, 5), dark, side * 0.43, 2.02, -0.2 + i * 0.43);
+                    plate.rotation.z = side * 0.18;
+                }
             }
-            sphere(0.57, skin, 0, 2.2, -0.38, 1.25, 0.7, 0.36);
-        } else if (species === 'pteranodon') {
+            if (species.includes('triceratops') || species.includes('kentrosaurus')) {
+                for (const side of [-1, 1]) {
+                    const horn = piece(new THREE.ConeGeometry(0.15, 0.93, 7), teeth, side * 0.38, 2.44, -1.0);
+                    horn.rotation.x = -0.4;
+                }
+                sphere(0.65, dark, 0, 2.12, -0.42, 1.34, 0.75, 0.35);
+            }
+            if (def.trait === 'armor' || def.trait === 'reflect') sphere(0.42, dark, 0, 1.12, 2.38);
+        } else if (wings) {
             for (const side of [-1, 1]) {
-                const wing = piece(new THREE.ConeGeometry(0.64, 2.2, 5), skin, side * 1.01, 1.64, 0.2);
+                const wing = piece(new THREE.ConeGeometry(0.9, 2.7, 4), dark, side * 1.08, 1.78, 0.13);
                 wing.rotation.z = side * Math.PI / 2;
+                const claw = piece(new THREE.ConeGeometry(0.13, 0.6, 6), teeth, side * 1.48, 1.88, -0.5);
+                claw.rotation.x = -0.55;
             }
-            const beak = piece(new THREE.ConeGeometry(0.22, 0.95, 5), belly, 0, 1.89, -1.27);
+            const beak = piece(new THREE.ConeGeometry(0.25, 1.12, 5), belly, 0, 1.81, -1.46);
             beak.rotation.x = -Math.PI / 2;
+            piece(new THREE.ConeGeometry(0.25, 0.9, 6), dark, 0, 2.36, -0.48).rotation.x = -0.5;
         } else {
-            for (let i = 0; i < 3; i++) {
-                const spine = piece(new THREE.ConeGeometry(0.18, 0.55, 5), detail, 0, 1.98, 0.2 + i * 0.5);
-                spine.rotation.x = -0.2;
+            for (let i = 0; i < 5; i++) {
+                const spike = piece(new THREE.ConeGeometry(0.16 + i * 0.012, 0.5 + i * 0.06, 6), dark, 0, 2.05, 0.04 + i * 0.43);
+                spike.rotation.x = -0.18;
+            }
+            for (const side of [-1, 1]) {
+                piece(new THREE.ConeGeometry(0.12, 0.52, 6), dark, side * 0.5, 2.47, -0.6).rotation.z = side * 0.4;
             }
         }
         result.userData.skin = skin;
+        result.scale.setScalar(def.rank >= 3 ? 1.12 : 1);
         return result;
     }
     box(13, 0.2, 540, 0x395a46, 0, -0.18, -240);
@@ -128,12 +163,12 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
     const collected = [];
     const followers = [];
     const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
-    function collectDinosaur(species) {
-        collected.push(species);
+    function collectDinosaur(species, level = 1) {
+        collected.push({species, level});
         notices.show(DINOSAURS[species].name + ' befreit!');
         if (followers.length >= 15) return;
         const follower = dinosaur(species, DINOSAURS[species].color);
-        follower.scale.setScalar(0.42);
+        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.62 : 0.56);
         follower.position.set(player.position.x, 0, 9.4);
         scene.add(follower);
         followers.push(follower);
@@ -224,16 +259,16 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
             objects.push(obj);
         }
     }
-    function cage(species) {
+    function cage(species, rarity = 'common') {
         const group = new THREE.Group();
         const creature = dinosaur(species, DINOSAURS[species].color);
-        creature.scale.setScalar(0.68);
+        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.88 : 0.84);
         creature.rotation.y = Math.PI;
         group.add(creature);
         const barLayout = cageBarLayout();
         const batches = [
-            [barLayout.frame, material(0x6a5843)],
-            [barLayout.iron, new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35})],
+            [barLayout.frame, material(rarity === 'rare' ? 0xae7938 : rarity === 'reinforced' ? 0x4f6974 : 0x6a5843)],
+            [barLayout.iron, new THREE.MeshStandardMaterial({color: rarity === 'rare' ? 0xecc56a : 0xc3d2cd, metalness: 0.65, roughness: 0.35})],
             [barLayout.latch, new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3})]
         ];
         const dummy = new THREE.Object3D();
@@ -264,10 +299,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
     function spawnWave(goalZ) {
         for (const item of createRunnerWave(spawnCount++, stage)) {
             if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
-            const group = cage(item.species);
+            const group = cage(item.species, item.rarity);
             group.position.set(item.x, 0, item.z);
             scene.add(group);
-            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, hp: 2, hitFlash: 0, group});
+            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, level: item.level,
+                rarity: item.rarity, hp: item.hp, maxHp: item.hp, hitFlash: 0, group});
         }
     }
     function spawnCoinWave(goalZ) {
@@ -343,13 +379,13 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
         disposeGroup(obj.group);
     }
     function shoot() {
-        const count = Math.min(7, temporary.bullets);
-        for (let i = 0; i < count; i++) {
-            const x = player.position.x + (i - (count - 1) / 2) * 0.4;
+        const volley = volleyPattern(Math.min(5, temporary.bullets), temporary.damage);
+        for (const shot of volley) {
+            const x = player.position.x + shot.offset;
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), material(0xffef9c));
             mesh.position.set(x, 1.5, 6);
             scene.add(mesh);
-            bullets.push({mesh, x, z: 6});
+            bullets.push({mesh, x, z: 6, spread: shot.spread, damage: shot.damage});
         }
         shots++;
         hitSound.hit('shot');
@@ -389,11 +425,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
                     updateGate(obj);
                 }
             } else {
-                const dealt = Math.min(Math.max(0, obj.hp), temporary.damage);
-                obj.hp -= temporary.damage;
+                const dealt = Math.min(Math.max(0, obj.hp), bullet.damage);
+                obj.hp -= bullet.damage;
                 obj.hitFlash = 0.18;
                 floatDamage(obj.x, 3.7, obj.z, dealt);
-                const fraction = Math.max(0, obj.hp / 2);
+                const fraction = Math.max(0, obj.hp / obj.maxHp);
                 const fill = obj.group.userData.healthFill;
                 fill.scale.x = Math.max(0.001, fraction);
                 fill.position.x = -2.45 * (1 - fraction) / 2;
@@ -401,7 +437,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
                 if (obj.hp <= 0) {
                     burst(obj.x, 2.1, obj.z, 'break');
                     hitSound.hit('break');
-                    collectDinosaur(obj.species);
+                    collectDinosaur(obj.species, obj.level);
                     removeObject(obj);
                 }
             }
@@ -453,7 +489,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         if (remaining > 0 && elapsed >= nextSpawn) {
             spawnWave(finishGoal.position.z);
-            nextSpawn += 1.65;
+            nextSpawn += 3.7;
         }
         if (remaining > 0 && elapsed >= nextGate) {
             spawnGatePair(finishGoal.position.z);
@@ -506,7 +542,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
             const bullet = bullets[i];
             const oldZ = bullet.z;
             bullet.z -= 48 * dt;
-            bullet.mesh.position.z = bullet.z;
+            bullet.x += bullet.spread * 48 * dt;
+            bullet.mesh.position.set(bullet.x, 1.5, bullet.z);
             if (bullet.z < -125 || collideBullet(bullet, oldZ)) {
                 bullets.splice(i, 1);
                 scene.remove(bullet.mesh);
