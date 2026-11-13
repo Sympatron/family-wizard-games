@@ -1,10 +1,10 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
+import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
-import {startRunner} from './runner/runner.js';
 import {BattleView} from './battle/view.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -16,14 +16,30 @@ const actions = document.querySelector('#actions');
 const stats = document.querySelector('#stats');
 const message = document.querySelector('#message');
 const help = document.querySelector('#help');
+const soundToggle = document.querySelector('#sound-toggle');
+const pauseToggle = document.querySelector('#pause-toggle');
+function renderSoundToggle() {
+    const enabled = isHitSoundEnabled();
+    if (!soundToggle) return;
+    soundToggle.textContent = enabled ? 'Ton: An' : 'Ton: Aus';
+    soundToggle.setAttribute('aria-pressed', String(enabled));
+    soundToggle.setAttribute('aria-label', enabled ? 'Ton ausschalten' : 'Ton einschalten');
+}
+soundToggle?.addEventListener('click', () => {
+    setHitSoundEnabled(!isHitSoundEnabled());
+    renderSoundToggle();
+});
+renderSoundToggle();
 let activePhase = null;
 let activeView = null;
+pauseToggle?.addEventListener('click', () => activeView?.togglePause?.());
 let state = null;
 let selected = null;
 let appliedRevision = -1;
 let appliedUser = null;
 let activeUser = null;
 let applying = false;
+let runnerStartToken = 0;
 const mergeDialog = document.createElement('dialog');
 mergeDialog.className = 'dino-merge-dialog';
 document.body.append(mergeDialog);
@@ -45,11 +61,13 @@ function chooseEvolution(ids, choices) {
     const title = document.createElement('h3');
     title.textContent = 'Dinosaurier fusionieren';
     const description = document.createElement('p');
-    description.textContent = 'Wähle die Entwicklung für deine beiden gleichen Dinos:';
+    description.textContent = choices.length === 1 ? 'Zwei gleiche Dinos werden zum nächsten Tier fusioniert.' : 'Wähle die nächste Art für zwei gleiche Tier-III-Dinos:';
     const buttons = document.createElement('div');
     buttons.className = 'dino-merge-options';
     for (const species of choices) {
-        addButton(buttons, SPECIES[species].name, () => {
+        const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
+        const label = source?.species === species ? SPECIES[species].name + ' · Tier ' + (source.level + 1) : SPECIES[species].name + ' · Tier I';
+        addButton(buttons, label, () => {
             mergeDialog.close();
             void execute('merge', {ids, into: species});
         });
@@ -62,8 +80,10 @@ function dropDinosaur(id, target) {
     if (activePhase !== 'formation') return;
     const result = resolveFormationDrop(state?.game.run, id, target);
     if (!result) return;
-    if (result.type === 'merge-choice') chooseEvolution(result.ids, result.choices);
-    else void execute(result.type, result.payload);
+    if (result.type === 'merge-choice') {
+        if (result.choices.length === 1) void execute('merge', {ids: result.ids, into: result.choices[0]});
+        else chooseEvolution(result.ids, result.choices);
+    } else void execute(result.type, result.payload);
 }
 function enableUnitDragging(button, id) {
     button.draggable = true;
@@ -151,10 +171,53 @@ async function refresh() {
     catch (error) { message.textContent = error.message; }
 }
 function cleanup() {
+    runnerStartToken++;
     if (mergeDialog.open) mergeDialog.close();
     activeView?.destroy();
     activeView = null;
     host.replaceChildren();
+}
+function showEvolutionTree() {
+    if (mergeDialog.open) mergeDialog.close();
+    mergeDialog.replaceChildren();
+    const title = document.createElement('h3');
+    title.textContent = 'Dinosaurier-Entwicklungsbaum';
+    const info = document.createElement('p');
+    info.textContent = '2 gleiche Dinos → nächstes Tier (I → II → III). Zwei Tier-III-Dinos wählen eine neue Art auf Tier I.';
+    const content = document.createElement('div');
+    content.className = 'dino-tree';
+    for (let rank = 1; rank <= 4; rank++) {
+        const section = document.createElement('section');
+        const heading = document.createElement('h4');
+        heading.textContent = 'Rang ' + ['I', 'II', 'III', 'IV'][rank - 1];
+        section.append(heading);
+        const cards = document.createElement('div');
+        cards.className = 'dino-tree-rank';
+        for (const [species, def] of Object.entries(SPECIES)) {
+            if (def.rank !== rank) continue;
+            const card = document.createElement('article');
+            card.className = 'dino-tree-species';
+            const image = document.createElement('img');
+            image.src = './assets/dinos/' + species + '.svg';
+            image.alt = def.name;
+            image.width = 72;
+            image.height = 56;
+            const label = document.createElement('strong');
+            label.textContent = def.name;
+            const role = document.createElement('small');
+            role.textContent = def.role + (def.evolutions.length ? ' → ' + def.evolutions.map(id => SPECIES[id].name).join(' / ') : ' · Apex');
+            card.append(image, label, role);
+            cards.append(card);
+        }
+        section.append(cards);
+        content.append(section);
+    }
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.textContent = 'Schließen';
+    close.addEventListener('click', () => mergeDialog.close());
+    mergeDialog.append(title, info, content, close);
+    mergeDialog.showModal();
 }
 function renderFormationStats(unit, run) {
     hud.replaceChildren();
@@ -164,7 +227,7 @@ function renderFormationStats(unit, run) {
     }
     const type = SPECIES[unit.species];
     const maximum = maxHp(unit, state.game.meta.upgrades);
-    const damage = Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15));
+    const damage = Math.round(type.damage * unitPower(unit) * (1 + run.battleUpgrades.damage * 0.15));
     const make = (tag, className, content) => {
         const element = document.createElement(tag);
         element.className = className;
@@ -180,7 +243,12 @@ function renderFormationStats(unit, run) {
     avatar.width = 56;
     avatar.height = 46;
     const identity = make('div', 'dino-stat-identity');
-    identity.append(make('strong', '', type.name), make('small', '', 'Level ' + unit.level + ' · ' + type.role));
+    const traitNames = {bleed: 'Blutung', stun: 'Betäubung', evasion: 'Ausweichen', burst: 'Kritischer Treffer',
+        rapid: 'Schnellangriff', armor: 'Panzerung', counter: 'Gegenangriff', pierce: 'Durchschlag',
+        support: 'Unterstützung', cleave: 'Flächenschaden', poison: 'Gift', reflect: 'Reflexion', heal: 'Heilung'};
+    identity.append(make('strong', '', type.name),
+        make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role),
+        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
     const health = make('div', 'dino-stat-health');
     health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
@@ -207,13 +275,13 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
     renderFormationStats(all.find(item => item.id === selected), run);
-    help.textContent = 'Ziehe gleiche Dinos desselben Levels aufeinander, um sie zu fusionieren. Andere Dinos tauschen ihre Plätze.';
+    help.textContent = 'Zwei gleiche Dinos derselben Tierstufe fusionieren. Tier III ermöglicht eine Artentwicklung.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
     for (const unit of all) {
         const species = SPECIES[unit.species];
-        const text = species.name + ' L' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
+        const text = species.name + ' R' + species.rank + ' T' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
         const button = addButton(picker, text, () => {
             selected = unit.id;
             formation();
@@ -225,12 +293,18 @@ function formation() {
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
+    addButton(row, 'Entwicklungsbaum', showEvolutionTree);
     if (run.army.some(unit => unit.id === selected)) {
         addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
     }
     const merge = mergeOptions(all);
     for (const option of merge) {
-        addButton(row, SPECIES[option.species].name + ' fusionieren', () => chooseEvolution(option.ids, option.choices));
+        const tier = all.find(unit => unit.id === option.ids[0])?.level ?? 1;
+        const label = SPECIES[option.species].name + (tier === 3 ? ' entwickeln' : ' Tier ' + (tier + 1));
+        addButton(row, label, () => {
+            if (option.choices.length === 1) void execute('merge', {ids: option.ids, into: option.choices[0]});
+            else chooseEvolution(option.ids, option.choices);
+        });
     }
     actions.append(row);
 }
@@ -280,39 +354,69 @@ function gameOver() {
     addButton(row, 'Neuen Lauf starten', () => void execute('new-run'));
     actions.append(row);
 }
-function beginRunner() {
+async function beginRunner() {
+    const token = ++runnerStartToken;
     const game = state.game;
+    if (pauseToggle) {
+        pauseToggle.disabled = true;
+        pauseToggle.textContent = 'Pause';
+        pauseToggle.setAttribute('aria-pressed', 'false');
+    }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
-    help.textContent = '← → oder auf der Strecke wischen. Triff Käfige zum Befreien und schieße auf Tore, um ihre Boni zu verbessern.';
-    activeView = startRunner(host, {
+    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Triff Käfige und verbessere Tore durch Schüsse.';
+    try {
+        const {startRunner} = await import('./runner/runner.js');
+        if (activePhase !== 'runner' || token !== runnerStartToken) return;
+        activeView = startRunner(host, {
         stage: game.run.stage, upgrades: game.meta.upgrades,
+        roster: [...game.run.army, ...game.run.inventory].map(unit => unit.species),
+        onPauseChange: paused => {
+            if (pauseToggle) {
+                pauseToggle.textContent = paused ? 'Weiter' : 'Pause';
+                pauseToggle.setAttribute('aria-pressed', String(paused));
+                pauseToggle.setAttribute('aria-label', paused ? 'Runner fortsetzen' : 'Runner pausieren');
+            }
+            message.textContent = paused ? 'Pausiert – mit Weiter oder P fortsetzen' : '';
+        },
         onProgress: progress => {
             hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
                 ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets;
+                ' · Kugeln ' + progress.temporary.bullets + ' · Münzen ' + (progress.coins ?? 0);
+            message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
-    });
+        });
+        if (pauseToggle) pauseToggle.disabled = false;
+    } catch (error) {
+        if (activePhase !== 'runner' || token !== runnerStartToken) return;
+        heading.textContent = 'Runner konnte nicht gestartet werden';
+        message.textContent = '3D-Spiel konnte nicht geladen werden: ' + error.message;
+        actions.replaceChildren();
+        if (pauseToggle) pauseToggle.disabled = true;
+        addButton(actions, 'Erneut versuchen', () => void beginRunner());
+    }
 }
 function apply(snapshot) {
     if (applying || (snapshot.revision === appliedRevision && snapshot.user.id === appliedUser)) return;
     applying = true;
     try {
-        state = snapshot;
+        state = {...snapshot, game: migrateGame(snapshot.game)};
+        snapshot = state;
         appliedRevision = snapshot.revision;
         appliedUser = snapshot.user.id;
         const phase = snapshot.game.run.phase;
         const previousUser = activeUser;
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
+        if (pauseToggle) pauseToggle.hidden = phase !== 'runner';
         hud.classList.toggle('dino-stats-panel', phase === 'formation');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
             activeUser = snapshot.user.id;
             message.textContent = '';
-            if (phase === 'runner') beginRunner();
+            if (phase === 'runner') void beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
                     onCell: cell => { if (selected) dropDinosaur(selected, cell); },

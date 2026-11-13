@@ -20,5 +20,7 @@ jobs:
         if: github.event.action != 'closed'
         with:
           node-version: '24'
+      - run: npm test
+        if: github.event.action != 'closed'
       - run: npm run build
         if: github.event.action != 'closed'

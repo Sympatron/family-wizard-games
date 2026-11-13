@@ -1,4 +1,9 @@
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js';
+let THREE;
+try {
+    THREE = await import('https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js');
+} catch {
+    THREE = await import('https://unpkg.com/three@0.187.0/build/three.module.js');
+}
 import {SPECIES as DINOSAURS} from '../core/game.js';
 import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
 import {createRanger} from './ranger.js';
@@ -7,11 +12,16 @@ import {createRunnerWave} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
 import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
+import {createRunnerNotice} from './notices.js';
+import {makeCoinWave, crossedCoin} from './coins.js';
+import {createRunnerClock} from './clock.js';
+import {cageBarLayout} from './cage-layout.js';
+import {volleyPattern, initialRunnerWeaponStats} from './shots.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) {
+export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -31,12 +41,18 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         scene.add(mesh);
         return mesh;
     }
-    function dinosaur(species, color) {
+    function dinosaur(species, color, caged = false) {
         const result = new THREE.Group();
+        const def = DINOSAURS[species];
         const skin = material(color);
-        const belly = material(0xe9ca9f);
-        const eyes = material(0x192333);
-        const detail = material(0x415569);
+        const dark = material(new THREE.Color(color).multiplyScalar(0.62));
+        const belly = material(0xdcc7a6);
+        const eyes = material(0xf5ae50);
+        const pupil = material(0x13212c);
+        const teeth = material(0xfff0d7);
+        const wings = ['pteranodon', 'quetzalcoatlus', 'tapejara', 'hatzegopteryx', 'arambourgiania', 'tupandactylus',
+            'caiuajara', 'thanatosdrakon', 'thalassodromeus'].includes(species);
+        const armored = def.role === 'Tank';
         function piece(geometry, mat, x, y, z, sx = 1, sy = 1, sz = 1) {
             const mesh = new THREE.Mesh(geometry, mat);
             mesh.position.set(x, y, z);
@@ -45,39 +61,69 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             return mesh;
         }
         const sphere = (radius, mat, x, y, z, sx = 1, sy = 1, sz = 1) =>
-            piece(new THREE.SphereGeometry(radius, 10, 8), mat, x, y, z, sx, sy, sz);
-        sphere(0.69, skin, 0, 1.35, 0.1, 1, 0.75, 1.3);
-        sphere(0.48, skin, 0, 1.95, -0.66);
-        sphere(0.39, belly, 0, 1.69, -1.0, 0.9, 0.5, 1.2);
+            piece(new THREE.SphereGeometry(radius, 12, 8), mat, x, y, z, sx, sy, sz);
+        sphere(0.78, skin, 0, 1.28, 0.12, armored ? 1.2 : 1, 0.84, 1.32);
+        sphere(0.52, skin, 0, 1.97, -0.76, 1.12, 0.94, 1);
+        sphere(0.36, belly, 0, 1.73, -1.18, 1.05, 0.36, 1.05);
+        const jaw = sphere(0.39, dark, 0, 1.68, -1.23, 1.13, 0.27, 0.9);
         for (const side of [-1, 1]) {
-            sphere(0.13, eyes, side * 0.36, 2.09, -0.91);
-            const leg = piece(new THREE.CylinderGeometry(0.17, 0.27, 0.95, 7), skin, side * 0.45, 0.55, 0.33);
+            sphere(0.15, dark, side * 0.42, 2.1, -1.1);
+            sphere(0.095, eyes, side * 0.45, 2.14, -1.2);
+            sphere(0.048, pupil, side * 0.47, 2.14, -1.28);
+            const brow = sphere(0.2, dark, side * 0.45, 2.28, -1.12, 1.3, 0.35, 0.85);
+            brow.rotation.z = side * -0.24;
+            const leg = piece(new THREE.CylinderGeometry(0.19, 0.29, 0.98, 7), skin, side * 0.48, 0.55, 0.34);
             (result.userData.legs ??= []).push(leg);
-            sphere(0.23, skin, side * 0.46, 0.13, -0.03, 0.8, 0.45, 1.3);
-            sphere(0.16, skin, side * 0.58, 1.39, -0.78, 0.65, 1.1, 0.65);
+            sphere(0.27, dark, side * 0.5, 0.14, -0.16, 0.8, 0.4, 1.5);
+            for (let claw = 0; claw < 3; claw++) {
+                const nail = piece(new THREE.ConeGeometry(0.055, 0.3, 5), teeth, side * (0.33 + claw * 0.16), 0.07, -0.5);
+                nail.rotation.x = -Math.PI / 2;
+            }
+            sphere(0.19, skin, side * 0.66, 1.42, -0.58, 0.8, 1.2, 0.68);
+            for (let tooth = 0; tooth < 4; tooth++) {
+                const fang = piece(new THREE.ConeGeometry(0.048, 0.19, 5), teeth, side * (0.17 + tooth * 0.1), 1.6, -1.48 + tooth * 0.025);
+                fang.rotation.z = Math.PI;
+            }
         }
-        const tail = piece(new THREE.ConeGeometry(0.42, 2.1, 8), skin, 0, 1.32, 1.36);
+        const tail = piece(new THREE.ConeGeometry(0.44, 2.4, 9), skin, 0, 1.32, 1.55);
         tail.rotation.x = Math.PI / 2;
-        if (species === 'triceratops') {
-            for (const side of [-1, 1]) {
-                const horn = piece(new THREE.ConeGeometry(0.14, 0.75, 7), belly, side * 0.34, 2.35, -1.02);
-                horn.rotation.x = -0.35;
+        if (armored) {
+            for (let i = 0; i < 5; i++) {
+                for (const side of [-1, 1]) {
+                    const plate = piece(new THREE.ConeGeometry(0.22, 0.62, 5), dark, side * 0.43, 2.02, -0.2 + i * 0.43);
+                    plate.rotation.z = side * 0.18;
+                }
             }
-            sphere(0.57, skin, 0, 2.2, -0.38, 1.25, 0.7, 0.36);
-        } else if (species === 'pteranodon') {
+            if (species.includes('triceratops') || species.includes('kentrosaurus')) {
+                for (const side of [-1, 1]) {
+                    const horn = piece(new THREE.ConeGeometry(0.15, 0.93, 7), teeth, side * 0.38, 2.44, -1.0);
+                    horn.rotation.x = -0.4;
+                }
+                sphere(0.65, dark, 0, 2.12, -0.42, 1.34, 0.75, 0.35);
+            }
+            if (def.trait === 'armor' || def.trait === 'reflect') sphere(0.42, dark, 0, 1.12, 2.38);
+        } else if (wings) {
             for (const side of [-1, 1]) {
-                const wing = piece(new THREE.ConeGeometry(0.64, 2.2, 5), skin, side * 1.01, 1.64, 0.2);
+                const wing = piece(new THREE.ConeGeometry(caged ? 0.46 : 0.9, caged ? 1.4 : 2.7, 4),
+                    dark, side * (caged ? 0.62 : 1.08), 1.78, 0.13);
                 wing.rotation.z = side * Math.PI / 2;
+                const claw = piece(new THREE.ConeGeometry(0.13, 0.6, 6), teeth, side * (caged ? 0.95 : 1.48), 1.88, -0.5);
+                claw.rotation.x = -0.55;
             }
-            const beak = piece(new THREE.ConeGeometry(0.22, 0.95, 5), belly, 0, 1.89, -1.27);
+            const beak = piece(new THREE.ConeGeometry(0.25, 1.12, 5), belly, 0, 1.81, -1.46);
             beak.rotation.x = -Math.PI / 2;
+            piece(new THREE.ConeGeometry(0.25, 0.9, 6), dark, 0, 2.36, -0.48).rotation.x = -0.5;
         } else {
-            for (let i = 0; i < 3; i++) {
-                const spine = piece(new THREE.ConeGeometry(0.18, 0.55, 5), detail, 0, 1.98, 0.2 + i * 0.5);
-                spine.rotation.x = -0.2;
+            for (let i = 0; i < 5; i++) {
+                const spike = piece(new THREE.ConeGeometry(0.16 + i * 0.012, 0.5 + i * 0.06, 6), dark, 0, 2.05, 0.04 + i * 0.43);
+                spike.rotation.x = -0.18;
+            }
+            for (const side of [-1, 1]) {
+                piece(new THREE.ConeGeometry(0.12, 0.52, 6), dark, side * 0.5, 2.47, -0.6).rotation.z = side * 0.4;
             }
         }
         result.userData.skin = skin;
+        result.scale.setScalar(def.rank >= 3 ? 1.12 : 1);
         return result;
     }
     box(13, 0.2, 540, 0x395a46, 0, -0.18, -240);
@@ -113,27 +159,32 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     const objects = [];
     const bullets = [];
     const particles = [];
+    const damageLabels = [];
     const hitSound = createHitSound();
+    const notices = createRunnerNotice();
     const collected = [];
     const followers = [];
     const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
-    function collectDinosaur(species) {
-        collected.push(species);
+    function collectDinosaur(species, level = 1) {
+        collected.push({species, level});
+        notices.show(DINOSAURS[species].name + ' befreit!');
         if (followers.length >= 15) return;
         const follower = dinosaur(species, DINOSAURS[species].color);
-        follower.scale.setScalar(0.42);
+        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.62 : 0.56);
         follower.position.set(player.position.x, 0, 9.4);
         scene.add(follower);
         followers.push(follower);
     }
-    const temporary = {damage: 1 + (upgrades.runnerDamage ?? 0) * 0.12, fireRate: 1, bullets: 1};
+    const temporary = initialRunnerWeaponStats(upgrades);
     let remaining = DURATION;
     let elapsed = 0;
     let playerHp = 3;
     let shots = 0;
     let kills = 0;
+    let runnerCoins = 0;
     let spawnCount = 0;
     let nextSpawn = 0.5;
+    let nextCoinWave = 1.1;
     let nextGate = 4.2;
     let gateCount = 0;
     let shotTimer = 0;
@@ -142,10 +193,9 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     let active = true;
     let dragging = false;
     let frame = 0;
-    let previous = performance.now();
+    const clock = createRunnerClock();
     const keys = new Set();
     let hurtFlash = 0;
-    let finishHold = null;
 
     function gateText(text, y, width, height, fontSize, color) {
         const canvas = document.createElement('canvas');
@@ -211,35 +261,31 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             objects.push(obj);
         }
     }
-    function cage(species) {
+    function cage(species, rarity = 'common') {
         const group = new THREE.Group();
-        const frame = material(0x6a5843);
-        const iron = new THREE.MeshStandardMaterial({color: 0xc3d2cd, metalness: 0.65, roughness: 0.35});
-        const lock = new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3});
-        function bar(width, height, depth, x, y, z, mat = iron) {
-            const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), mat);
-            mesh.position.set(x, y, z);
-            group.add(mesh);
-            return mesh;
-        }
-        const creature = dinosaur(species, DINOSAURS[species].color);
-        creature.scale.setScalar(0.68);
+        const creature = dinosaur(species, DINOSAURS[species].color, true);
+        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.82 : 0.84);
         creature.rotation.y = Math.PI;
         group.add(creature);
-        bar(2.85, 0.3, 2.85, 0, 0.1, 0, frame);
-        bar(2.85, 0.26, 2.85, 0, 3.05, 0, frame);
-        for (const x of [-1.36, 1.36]) {
-            for (const z of [-1.36, 1.36]) bar(0.18, 3.05, 0.18, x, 1.6, z, frame);
+        const barLayout = cageBarLayout();
+        const batches = [
+            [barLayout.frame, material(rarity === 'rare' ? 0xae7938 : rarity === 'reinforced' ? 0x4f6974 : 0x6a5843)],
+            [barLayout.iron, new THREE.MeshStandardMaterial({color: rarity === 'rare' ? 0xecc56a : 0xc3d2cd, metalness: 0.65, roughness: 0.35})],
+            [barLayout.latch, new THREE.MeshStandardMaterial({color: 0xf1d277, metalness: 0.55, roughness: 0.3})]
+        ];
+        const dummy = new THREE.Object3D();
+        for (const [bars, mat] of batches) {
+            const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, bars.length);
+            for (const [index, bar] of bars.entries()) {
+                dummy.position.set(...bar.position);
+                dummy.scale.set(...bar.size);
+                dummy.updateMatrix();
+                mesh.setMatrixAt(index, dummy.matrix);
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            mesh.computeBoundingSphere();
+            group.add(mesh);
         }
-        for (const z of [-1.36, 1.36]) {
-            for (const x of [-1.01, -0.67, -0.33, 0, 0.33, 0.67, 1.01]) bar(0.065, 2.8, 0.08, x, 1.59, z);
-            bar(2.8, 0.09, 0.09, 0, 1.58, z);
-        }
-        for (const x of [-1.36, 1.36]) {
-            for (const z of [-0.82, -0.27, 0.27, 0.82]) bar(0.08, 2.8, 0.065, x, 1.59, z);
-        }
-        for (const x of [-0.72, 0, 0.72]) bar(0.08, 0.075, 2.85, x, 3.2, 0);
-        bar(0.32, 0.4, 0.19, 0.36, 1.53, 1.51, lock);
         const background = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.37, 0.1),
             new THREE.MeshBasicMaterial({color: 0x14252c, depthTest: false}));
         background.position.set(0, 3.72, 1.38);
@@ -253,13 +299,40 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         return group;
     }
     function spawnWave(goalZ) {
-        for (const item of createRunnerWave(spawnCount++, stage)) {
+        for (const item of createRunnerWave(spawnCount++, stage, Math.random, roster)) {
             if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
-            const group = cage(item.species);
+            const group = cage(item.species, item.rarity);
             group.position.set(item.x, 0, item.z);
             scene.add(group);
-            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, hp: 2, hitFlash: 0, group});
+            objects.push({kind: 'cage', x: item.x, z: item.z, species: item.species, level: item.level,
+                rarity: item.rarity, hp: item.hp, maxHp: item.hp, hitFlash: 0, group});
         }
+    }
+    function spawnCoinWave(goalZ) {
+        for (const item of makeCoinWave()) {
+            if (!canSpawnBeforeGoal(item.z, goalZ, 3)) continue;
+            const group = new THREE.Group();
+            const metal = new THREE.MeshStandardMaterial({
+                color: item.value === 10 ? 0xffcd46 : item.value === 5 ? 0xc4e0ee : 0xc98b50,
+                metalness: 0.75, roughness: 0.25
+            });
+            const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.64, 0.64, 0.14, 18), metal);
+            coin.rotation.x = Math.PI / 2;
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(0.57, 0.075, 6, 20), metal);
+            group.add(coin, rim);
+            const text = gateText(String(item.value), 0, 0.8, 0.6, 188, '#25323a');
+            text.position.z = 0.18;
+            group.add(text);
+            group.position.set(item.x, 1.55, item.z);
+            scene.add(group);
+            objects.push({...item, group});
+        }
+    }
+    function floatDamage(x, y, z, amount) {
+        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 1.8, 0.85, 210, '#ffad93');
+        sprite.position.set(x, y, z);
+        scene.add(sprite);
+        damageLabels.push({sprite, remaining: 0.8});
     }
     function createFinishGoal() {
         const group = new THREE.Group();
@@ -308,15 +381,16 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         disposeGroup(obj.group);
     }
     function shoot() {
-        const count = Math.min(7, temporary.bullets);
-        for (let i = 0; i < count; i++) {
-            const x = player.position.x + (i - (count - 1) / 2) * 0.4;
+        const volley = volleyPattern(Math.min(5, temporary.bullets), temporary.damage);
+        for (const shot of volley) {
+            const x = player.position.x + shot.offset;
             const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), material(0xffef9c));
             mesh.position.set(x, 1.5, 6);
             scene.add(mesh);
-            bullets.push({mesh, x, z: 6});
+            bullets.push({mesh, x, z: 6, spread: shot.spread, damage: shot.damage});
         }
         shots++;
+        hitSound.hit('shot');
     }
     function burst(x, y, z, kind = 'impact') {
         const color = kind === 'break' ? 0x7ee6ac : kind === 'upgrade' ? 0x70cfff : 0xffd389;
@@ -329,12 +403,16 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         }
     }
     function collectGate(obj) {
+        const previous = temporary[obj.modifier];
         Object.assign(temporary, applyGate(temporary, obj));
+        const current = temporary[obj.modifier];
+        notices.show(gateLabel(obj) + ': ' + previous.toFixed(2) + ' → ' + current.toFixed(2));
         burst(obj.x, 2.3, player.position.z, 'upgrade');
         hitSound.hit('upgrade');
     }
     function collideBullet(bullet, previousZ) {
         for (const obj of objects) {
+            if (obj.kind === 'coin') continue;
             const hit = obj.kind === 'gate'
                 ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
                 : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
@@ -349,9 +427,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                     updateGate(obj);
                 }
             } else {
-                obj.hp -= temporary.damage;
+                const dealt = Math.min(Math.max(0, obj.hp), bullet.damage);
+                obj.hp -= bullet.damage;
                 obj.hitFlash = 0.18;
-                const fraction = Math.max(0, obj.hp / 2);
+                floatDamage(obj.x, 3.7, obj.z, dealt);
+                const fraction = Math.max(0, obj.hp / obj.maxHp);
                 const fill = obj.group.userData.healthFill;
                 fill.scale.x = Math.max(0.001, fraction);
                 fill.position.x = -2.45 * (1 - fraction) / 2;
@@ -359,7 +439,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 if (obj.hp <= 0) {
                     burst(obj.x, 2.1, obj.z, 'break');
                     hitSound.hit('break');
-                    collectDinosaur(obj.species);
+                    collectDinosaur(obj.species, obj.level);
                     removeObject(obj);
                 }
             }
@@ -371,14 +451,18 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         if (!active) return;
         active = false;
         destroy();
-        onFinish({collected, temporary, kills, shots});
+        onFinish({collected, temporary, kills, shots, coins: runnerCoins});
     }
     function animate(time) {
         if (!active) return;
-        const dt = Math.min(0.05, (time - previous) / 1000);
-        previous = time;
+        const dt = clock.tick(time);
+        if (clock.paused) {
+            frame = requestAnimationFrame(animate);
+            return;
+        }
         elapsed += dt;
         remaining = Math.max(0, DURATION - elapsed);
+        notices.tick(dt);
         if (keys.has('ArrowLeft') || keys.has('KeyA')) targetX -= dt * 8;
         if (keys.has('ArrowRight') || keys.has('KeyD')) targetX += dt * 8;
         targetX = clamp(targetX, -5.15, 5.15);
@@ -403,15 +487,19 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             shoot();
             shotTimer += 0.28 / temporary.fireRate;
         }
-        const speed = 17 + stage * 0.6;
+        const speed = 17 + Math.min(stage, 12) * 0.6;
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         if (remaining > 0 && elapsed >= nextSpawn) {
             spawnWave(finishGoal.position.z);
-            nextSpawn += 1.65;
+            nextSpawn += 3.7;
         }
         if (remaining > 0 && elapsed >= nextGate) {
             spawnGatePair(finishGoal.position.z);
             nextGate += 9.8;
+        }
+        if (remaining > 0 && elapsed >= nextCoinWave) {
+            spawnCoinWave(finishGoal.position.z);
+            nextCoinWave += 2.2;
         }
         for (const marking of markings) {
             marking.position.z += speed * dt;
@@ -428,6 +516,17 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             const previousZ = obj.z;
             obj.z += speed * dt;
             obj.group.position.z = obj.z;
+            if (obj.kind === 'coin') {
+                obj.group.rotation.y += dt * 2.5;
+                if (crossedCoin(player.position.x, player.position.z, previousZ, obj.z, obj.x)) {
+                    runnerCoins += obj.value;
+                    hitSound.hit('coin');
+                    notices.show('+' + obj.value + ' Münzen');
+                    burst(obj.x, 1.7, obj.z, 'upgrade');
+                    removeObject(obj);
+                } else if (obj.z > player.position.z + 2) removeObject(obj);
+                continue;
+            }
             if (obj.kind === 'gate') {
                 if (previousZ <= player.position.z && obj.z >= player.position.z) {
                     const pair = objects.filter(gate => gate.kind === 'gate' && gate.pairId === obj.pairId);
@@ -445,7 +544,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
             const bullet = bullets[i];
             const oldZ = bullet.z;
             bullet.z -= 48 * dt;
-            bullet.mesh.position.z = bullet.z;
+            bullet.x += bullet.spread * 48 * dt;
+            bullet.mesh.position.set(bullet.x, 1.5, bullet.z);
             if (bullet.z < -125 || collideBullet(bullet, oldZ)) {
                 bullets.splice(i, 1);
                 scene.remove(bullet.mesh);
@@ -469,15 +569,25 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
                 particle.mesh.material.opacity = Math.min(1, particle.life / 0.25);
             }
         }
+        for (let i = damageLabels.length - 1; i >= 0; i--) {
+            const label = damageLabels[i];
+            label.remaining -= dt;
+            label.sprite.position.y += 1.7 * dt;
+            label.sprite.material.opacity = Math.max(0, label.remaining / 0.8);
+            if (label.remaining <= 0) {
+                scene.remove(label.sprite);
+                label.sprite.material.map?.dispose();
+                label.sprite.material.dispose();
+                damageLabels.splice(i, 1);
+            }
+        }
         reportTimer -= dt;
         if (reportTimer <= 0) {
-            onProgress({seconds: Math.ceil(remaining), collected: collected.length, hp: Math.max(0, playerHp), temporary});
+            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: runnerCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
-        if (remaining <= 0 && finishHold === null) finishHold = 0.8;
-        if (finishHold !== null) finishHold -= dt;
-        if (playerHp <= 0 || (finishHold !== null && finishHold <= 0)) finish();
+        if (playerHp <= 0 || remaining <= 0) finish();
         else frame = requestAnimationFrame(animate);
     }
     function setPointer(event) {
@@ -485,17 +595,34 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         targetX = clamp(((event.clientX - rect.left) / rect.width - 0.5) * 12, -5.15, 5.15);
     }
     function pointerDown(event) {
+        if (clock.paused) return;
         hitSound.unlock();
         dragging = true;
         renderer.domElement.setPointerCapture(event.pointerId);
         setPointer(event);
     }
     function pointerMove(event) {
-        if (dragging) setPointer(event);
+        if (dragging && !clock.paused) setPointer(event);
     }
     function pointerUp() { dragging = false; }
+    function setPaused(paused) {
+        if (!active || clock.paused === paused) return;
+        if (paused) clock.pause();
+        else clock.resume();
+        onPauseChange(paused);
+    }
+    function togglePause() { setPaused(!clock.paused); }
+    function visibilityChange() {
+        if (document.hidden) setPaused(true);
+    }
     function keyDown(event) {
         hitSound.unlock();
+        if (event.code === 'KeyP' && !event.repeat) {
+            event.preventDefault();
+            togglePause();
+            return;
+        }
+        if (clock.paused) return;
         if (['ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD'].includes(event.code)) {
             event.preventDefault();
             keys.add(event.code);
@@ -524,6 +651,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
     renderer.domElement.addEventListener('pointercancel', pointerUp);
     window.addEventListener('keydown', keyDown);
     window.addEventListener('keyup', keyUp);
+    document.addEventListener('visibilitychange', visibilityChange);
+    if (document.hidden) setPaused(true);
     frame = requestAnimationFrame(animate);
     function destroy() {
         cancelAnimationFrame(frame);
@@ -535,6 +664,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         renderer.domElement.removeEventListener('pointercancel', pointerUp);
         window.removeEventListener('keydown', keyDown);
         window.removeEventListener('keyup', keyUp);
+        document.removeEventListener('visibilitychange', visibilityChange);
         for (const obj of [...objects]) removeObject(obj);
         for (const bullet of bullets) {
             scene.remove(bullet.mesh);
@@ -553,5 +683,11 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish}) 
         renderer.dispose();
         renderer.domElement.remove();
     }
-    return {destroy: () => { if (active) { active = false; destroy(); } }};
+    return {
+        destroy: () => { if (active) { active = false; destroy(); } },
+        pause: () => setPaused(true),
+        resume: () => setPaused(false),
+        togglePause,
+        get paused() { return clock.paused; }
+    };
 }
