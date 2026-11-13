@@ -6,7 +6,7 @@ const {BattleView, MASTERY_APPEARANCE} = await import('../games/dino-rush-battle
 
 const makeElement = () => {
     const object = {x: 0, y: 0, depth: 1};
-    for (const method of ['setDepth', 'fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect', 'setOrigin', 'setVisible', 'setText', 'clear']) {
+    for (const method of ['setDepth', 'setDisplaySize', 'fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect', 'setOrigin', 'setVisible', 'setText', 'clear']) {
         object[method] = () => object;
     }
     object.setPosition = (x, y) => { object.x = x; object.y = y; return object; };
@@ -28,7 +28,7 @@ const createView = (portrait = false, {army = [], inventory = []} = {}) => {
     };
     const scene = {
         game: {canvas},
-        add: {graphics: makeElement, rectangle: makeElement, text: makeElement}
+        add: {graphics: makeElement, rectangle: makeElement, text: makeElement, image: makeElement}
     };
     const events = [];
     const view = Object.create(BattleView.prototype);
@@ -53,7 +53,7 @@ const unit = (id, species, cell) => ({id, species, cell, hp: 70, level: 1});
 test('spare dinosaurs use the same render units with paging and large navigation targets', () => {
     for (const portrait of [true, false]) {
         const view = createView(portrait, {inventory: Array.from({length: 30}, (_, index) => unit('d' + index, 'raptor', null))}).view;
-        const pageSize = portrait ? 7 : 13;
+        const pageSize = 9;
         assert.equal(view.reserveUnits().length, pageSize);
         assert.ok(view.reserveUnits().every(dino => dino.team === 'reserve' && dino.hp === 70));
         const firstId = view.reserveUnits()[0].id;
@@ -101,8 +101,8 @@ test('dropping a deployed dinosaur into empty reserve space works with mouse and
         const {view, events, send} = createView(false, {army: [dino]});
         const from = view.cellCenter('player', 0);
         send('pointerdown', from, 12, pointerType);
-        send('pointermove', {x: 360, y: 590}, 12, pointerType);
-        send('pointerup', {x: 360, y: 590}, 12, pointerType);
+        send('pointermove', {x: 900, y: 360}, 12, pointerType);
+        send('pointerup', {x: 900, y: 360}, 12, pointerType);
         assert.deepEqual(events, [{type: 'drop', id: 'd1', target: {reserve: true}}]);
     }
 });
@@ -152,4 +152,22 @@ test('tier captions render above other dinosaur sprites and follow moving units'
     view.update(16);
     assert.equal(entry.mastery.x, 280);
     assert.equal(entry.mastery.y, 327);
+});
+
+test('reserve fills right-hand sidebar vertically in both orientations', () => {
+    for (const portrait of [true, false]) {
+        const inventory = Array.from({length: 18}, (_, index) => unit('d' + index, 'raptor', null));
+        const {view, send, events} = createView(portrait, {inventory});
+        const units = view.reserveUnits();
+        assert.equal(units.length, 9);
+        assert.ok(units.every(dino => dino.x > view.width * 0.75));
+        assert.ok(units.every((dino, i) => i === 0 || dino.y > units[i - 1].y));
+        assert.ok(units.at(-1).y - units[0].y >= 400);
+        assert.deepEqual(view.targetAtPoint(units[0].x, units[0].y), {unitId: units[0].id, reserve: true});
+        assert.equal(view.targetAtPoint(view.width - 3, 300).reserve, true);
+        assert.equal(view.targetAtPoint(view.width / 2, 300), null);
+        send('pointerdown', units[0], 7, 'touch');
+        send('pointerup', units[0], 7, 'touch');
+        assert.deepEqual(events, [{type: 'select', id: units[0].id}]);
+    }
 });
