@@ -53,7 +53,7 @@ const unit = (id, species, cell) => ({id, species, cell, hp: 70, level: 1});
 test('spare dinosaurs use the same render units with paging and large navigation targets', () => {
     for (const portrait of [true, false]) {
         const view = createView(portrait, {inventory: Array.from({length: 30}, (_, index) => unit('d' + index, 'raptor', null))}).view;
-        const pageSize = 9;
+        const pageSize = 6;
         assert.equal(view.reserveUnits().length, pageSize);
         assert.ok(view.reserveUnits().every(dino => dino.team === 'reserve' && dino.hp === 70));
         const firstId = view.reserveUnits()[0].id;
@@ -159,7 +159,7 @@ test('reserve fills right-hand sidebar vertically in both orientations', () => {
         const inventory = Array.from({length: 18}, (_, index) => unit('d' + index, 'raptor', null));
         const {view, send, events} = createView(portrait, {inventory});
         const units = view.reserveUnits();
-        assert.equal(units.length, 9);
+        assert.equal(units.length, 6);
         assert.ok(units.every(dino => dino.x > view.width * 0.75));
         assert.ok(units.every((dino, i) => i === 0 || dino.y > units[i - 1].y));
         assert.ok(units.at(-1).y - units[0].y >= 400);
