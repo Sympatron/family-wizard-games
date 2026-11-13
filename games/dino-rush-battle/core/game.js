@@ -1,14 +1,19 @@
-export const SPECIES = Object.freeze({
-    raptor: {name: 'Raptor', role: 'Nahkampf', hp: 70, damage: 12, range: 44, speed: 62, cooldown: 0.85, color: 0x66cf88, evolutions: ['allosaurus', 'troodon']},
-    triceratops: {name: 'Triceratops', role: 'Tank', hp: 125, damage: 9, range: 42, speed: 40, cooldown: 1.1, color: 0xdaa969, evolutions: ['ankylosaurus', 'stegosaurus']},
-    pteranodon: {name: 'Pteranodon', role: 'Fernkampf', hp: 53, damage: 10, range: 225, speed: 52, cooldown: 1.15, color: 0x70b9ee, evolutions: ['troodon', 'stegosaurus']},
-    allosaurus: {name: 'Allosaurus', role: 'Nahkampf', hp: 135, damage: 23, range: 52, speed: 61, cooldown: 0.85, color: 0xee8064, evolutions: []},
-    troodon: {name: 'Troodon', role: 'Fernkampf', hp: 85, damage: 17, range: 245, speed: 67, cooldown: 0.7, color: 0xb38af1, evolutions: []},
-    ankylosaurus: {name: 'Ankylosaurus', role: 'Tank', hp: 210, damage: 17, range: 48, speed: 35, cooldown: 1.25, color: 0xebba59, evolutions: []},
-    stegosaurus: {name: 'Stegosaurus', role: 'Fernkampf', hp: 110, damage: 19, range: 210, speed: 48, cooldown: 1.35, color: 0x9fa9ee, evolutions: []}
-});
+import {SPECIES, MAX_TIER} from './species.js';
+export {SPECIES} from './species.js';
+export function migrateGame(game) {
+    if (!game || game.version >= 2) return game;
+    const result = structuredClone(game);
+    result.version = 2;
+    for (const unit of [...(result.run?.army ?? []), ...(result.run?.inventory ?? [])]) {
+        const rank = SPECIES[unit.species]?.rank ?? 1;
+        unit.level = Math.max(1, Math.min(MAX_TIER, (unit.level ?? 1) - (rank > 1 ? 1 : 0)));
+        unit.hp = Math.min(unit.hp, maxHp(unit, result.meta?.upgrades));
+    }
+    return result;
+}
+
 export const INITIAL_GAME = {
-    version: 1,
+    version: 2,
     meta: {currency: 0, upgrades: {starterHp: 0, runnerDamage: 0}},
     run: createRun()
 };
@@ -37,7 +42,9 @@ export function nextFreeCell(army, species) {
 }
 export function getMergeChoices(first, second) {
     if (!first || !second || first.id === second.id || first.species !== second.species || first.level !== second.level) return [];
-    return SPECIES[first.species]?.evolutions ?? [];
+    const species = SPECIES[first.species];
+    if (!species || first.level < 1 || first.level > MAX_TIER) return [];
+    return first.level < MAX_TIER ? [first.species] : species.evolutions;
 }
 export function mergeOptions(army) {
     const result = [];
@@ -57,7 +64,7 @@ export function mergeOptions(army) {
     });
 }
 export function reduceGame(game, action) {
-    const next = structuredClone(game);
+    const next = structuredClone(migrateGame(game));
     const run = next.run;
     const fail = message => { throw new Error(message); };
     switch (action.type) {
@@ -140,11 +147,13 @@ export function reduceGame(game, action) {
             if (!getMergeChoices(a, b).includes(into)) fail('Diese Dinosaurier können nicht fusionieren.');
             run.army = run.army.filter(unit => !ids.includes(unit.id));
             run.inventory = run.inventory.filter(unit => !ids.includes(unit.id));
-            const upgraded = {id: 'd' + run.nextId++, species: into, level: a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};
+            const evolves = into !== a.species;
+            const upgraded = {id: 'd' + run.nextId++, species: into, level: evolves ? 1 : a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};
+            if (evolves && SPECIES[into].rank === 4) upgraded.trait = a.trait ?? SPECIES[a.species].trait;
             upgraded.hp = maxHp(upgraded, next.meta.upgrades);
             if (upgraded.cell === null) run.inventory.push(upgraded);
             else run.army.push(upgraded);
-            return {game: next, message: upgraded.species + ' entwickelt!'};
+            return {game: next, message: SPECIES[upgraded.species].name + (evolves ? ' entwickelt!' : ' auf Tier ' + upgraded.level + ' fusioniert!')};
         }
         case 'start-battle':
             if (run.phase !== 'formation' || !run.army.some(unit => unit.hp > 0)) fail('Stelle mindestens einen gesunden Dino auf.');
