@@ -7,6 +7,8 @@ import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
 import {BattleView} from './battle/view.js';
 import {createRunnerHud} from './runner/hud.js';
+import {initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS, MAX_BULLETS} from './runner/shots.js';
+import {GUN_UPGRADES, gunUpgradeCost, healingCost} from './core/shop.js';
 import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -237,21 +239,76 @@ function beginBattle() {
 function rewards() {
     const run = state.game.run;
     heading.textContent = 'Sieg! Stufe ' + run.stage + ' geschafft';
-    hud.textContent = '+' + run.lastResult.money + ' Münzen · ' + run.potions + ' Heiltränke';
-    help.textContent = 'Verletzte Dinos behalten ihren Schaden. Überlebende haben sich bereits etwas erholt.';
+    hud.textContent = '+' + run.lastResult.money + ' Münzen · Guthaben: ' + run.money + ' Münzen';
+    help.textContent = 'Waffenupgrades bleiben für diesen Durchlauf erhalten. Verletzte Dinos können einzeln geheilt werden.';
     actions.replaceChildren();
-    paragraph(actions, 'Heiltränke kosten 20 Münzen und heilen 60 % der maximalen Lebenspunkte. Auch bewusstlose Dinos können damit wiederbelebt werden.');
+
+    const gunSection = document.createElement('section');
+    gunSection.className = 'dino-shop-section';
+    const gunTitle = document.createElement('h3');
+    gunTitle.textContent = 'Runner-Waffe verbessern';
+    const gunRow = document.createElement('div');
+    gunRow.className = 'dino-shop-gun-grid';
+    const base = initialRunnerWeaponStats(state.game.meta.upgrades, run.gunUpgrades);
+    for (const [kind, config] of Object.entries(GUN_UPGRADES)) {
+        const level = run.gunUpgrades[kind];
+        const maxed = config.maxLevel !== undefined && level >= config.maxLevel;
+        const cost = maxed ? null : gunUpgradeCost(kind, level);
+        const current = kind === 'damage' ? base.damage.toFixed(1) + ' Schaden/Kugel'
+            : kind === 'fireRate' ? (base.fireRate / SHOT_INTERVAL_SECONDS).toFixed(1) + ' Serien/s'
+            : base.bullets + '/' + MAX_BULLETS + ' Kugeln';
+        const button = addButton(gunRow, config.label + ' · ' + current + ' · ' + config.increase +
+            (maxed ? ' · MAX' : ' · ' + cost + ' Münzen'), () => void execute('buy-gun-upgrade', {kind}),
+        {disabled: maxed || run.money < cost});
+        button.classList.add('dino-shop-gun-upgrade');
+    }
+    gunSection.append(gunTitle, gunRow);
+    actions.append(gunSection);
+
+    const healSection = document.createElement('section');
+    healSection.className = 'dino-shop-section';
+    const healTitle = document.createElement('h3');
+    healTitle.textContent = 'Dinos heilen';
+    const healList = document.createElement('div');
+    healList.className = 'dino-heal-list';
+    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));
+    if (!injured.length) paragraph(healList, 'Alle Dinos sind gesund.');
+    for (const unit of injured) {
+        const maximum = maxHp(unit, state.game.meta.upgrades);
+        const cost = healingCost(unit.hp, maximum);
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dino-heal-card';
+        button.disabled = run.money < cost;
+        const image = document.createElement('img');
+        image.src = './assets/dinos/' + unit.species + '.svg';
+        image.alt = SPECIES[unit.species].name;
+        image.width = 80;
+        image.height = 64;
+        const details = document.createElement('span');
+        details.className = 'dino-heal-details';
+        const name = document.createElement('strong');
+        name.textContent = SPECIES[unit.species].name + ' · Tier ' + unit.level;
+        const health = document.createElement('span');
+        health.textContent = 'Leben ' + unit.hp + '/' + maximum + ' · +' + (maximum - unit.hp) + ' LP';
+        const price = document.createElement('strong');
+        price.className = 'dino-heal-price';
+        price.textContent = 'Vollständig heilen · ' + cost + ' Münzen';
+        details.append(name, health, price);
+        button.append(image, details);
+        button.addEventListener('click', () => void execute('heal', {id: unit.id}));
+        healList.append(button);
+    }
+    healSection.append(healTitle, healList);
+    actions.append(healSection);
+
     const row = document.createElement('div');
     row.className = 'action-row';
-    addButton(row, 'Heiltrank kaufen (20)', () => void execute('buy-potion'), {disabled: run.money < 20});
     const damageCost = 30 + 20 * run.battleUpgrades.damage;
-    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ')', () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
+    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ' Münzen)',
+        () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
     addButton(row, 'Nächste Stufe', () => void execute('next-stage'));
     actions.append(row);
-    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));
-    for (const unit of injured) {
-        addButton(actions, SPECIES[unit.species].name + ' heilen (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')', () => void execute('heal', {id: unit.id}), {disabled: run.potions < 1});
-    }
 }
 function gameOver() {
     const game = state.game;
@@ -288,7 +345,7 @@ async function beginRunner() {
         const {startRunner} = await import('./runner/runner.js');
         if (activePhase !== 'runner' || token !== runnerStartToken) return;
         activeView = startRunner(host, {
-        stage: game.run.stage, upgrades: game.meta.upgrades,
+        stage: game.run.stage, upgrades: game.meta.upgrades, gunUpgrades: game.run.gunUpgrades,
         roster: [...game.run.army, ...game.run.inventory].map(unit => unit.species),
         onPauseChange: paused => {
             if (pauseToggle) {
