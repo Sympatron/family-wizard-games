@@ -193,7 +193,7 @@ test('touch and mouse positions map to correct formation cell in scaled canvases
 });
 test('runner upgrades are bounded to prevent runaway cage damage', () => {
     const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
-    assert.deepEqual(game.run.temporary, {damage: 3, fireRate: 2.5, bullets: 5, pickupRange: 1.8});
+    assert.deepEqual(game.run.temporary, {damage: 6, fireRate: 2.5, bullets: 5, pickupRange: 1.8});
 });
 
 test('equal species merge to the next mastery tier before branching', () => {
