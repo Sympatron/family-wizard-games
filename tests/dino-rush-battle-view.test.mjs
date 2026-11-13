@@ -10,6 +10,9 @@ const makeElement = () => {
         object[method] = () => object;
     }
     object.setPosition = (x, y) => { object.x = x; object.y = y; return object; };
+    object.setAlpha = alpha => {object.alpha = alpha; return object;};
+    object.setTint = tint => {object.tint = tint; return object;};
+    object.setVisible = visible => {object.visible = visible; return object;};
     return object;
 };
 const createView = (portrait = false, {army = [], inventory = []} = {}) => {
@@ -170,4 +173,61 @@ test('reserve fills right-hand sidebar vertically in both orientations', () => {
         send('pointerup', units[0], 7, 'touch');
         assert.deepEqual(events, [{type: 'select', id: units[0].id}]);
     }
+});
+
+test('dragging greys out nonmergeable dinosaurs and enemies, while matching tiers stay clear', () => {
+    const starter = unit('d1', 'raptor', 0);
+    const compatible = unit('d2', 'raptor', 1);
+    const otherSpecies = unit('d3', 'triceratops', 2);
+    const otherTier = {...unit('d4', 'raptor', null), level: 2};
+    const matchingReserve = unit('d5', 'raptor', null);
+    const {view, send} = createView(false, {army: [starter, compatible, otherSpecies], inventory: [otherTier, matchingReserve]});
+    view.enemies = [unit('e1', 'triceratops', 0)];
+    const entries = [
+        ['player:d1', starter], ['player:d2', compatible], ['player:d3', otherSpecies],
+        ['reserve:d4', otherTier], ['reserve:d5', matchingReserve], ['enemy:e1', view.enemies[0]]
+    ];
+    for (const [key] of entries) {
+        view.units.set(key, {container: makeElement(), sprite: makeElement(), mastery: makeElement()});
+    }
+    const origin = view.cellCenter('player', starter.cell);
+    send('pointerdown', origin);
+    assert.equal(view.units.get('player:d3').container.alpha, undefined, 'selection alone must not dim units');
+    send('pointermove', {x: origin.x + 30, y: origin.y});
+    for (const key of ['player:d1', 'player:d2', 'reserve:d5']) {
+        assert.equal(view.units.get(key).container.alpha, 1, key + ' should remain clear');
+    }
+    for (const key of ['player:d3', 'reserve:d4', 'enemy:e1']) {
+        assert.equal(view.units.get(key).container.alpha, 0.28, key + ' should be dimmed');
+        assert.equal(view.units.get(key).sprite.tint, 0x777777);
+        assert.equal(view.units.get(key).mastery.alpha, 0.28);
+    }
+    send('pointerup', {x: origin.x + 30, y: origin.y});
+    for (const [key] of entries) {
+        assert.equal(view.units.get(key).container.alpha, 1, key + ' should restore its opacity');
+        assert.equal(view.units.get(key).sprite.tint, 0xffffff);
+    }
+});
+
+test('battle rendering hides the colored tier auras and selection ellipses', () => {
+    function node(x = 0, y = 0) {
+        const result = makeElement().setPosition(x, y);
+        result.add = children => {result.children = children; return result;};
+        result.destroy = () => {};
+        return result;
+    }
+    const view = Object.create(BattleView.prototype);
+    const sprite = {id: 'd1', team: 'player', species: 'raptor', level: 3, x: 220, y: 210, hp: 70, maxHp: 70};
+    Object.assign(view, {
+        mode: 'battle', destroyed: false, portrait: false,
+        scene: {add: {container: node, ellipse: node, image: node, text: node, rectangle: node}},
+        units: new Map(), army: [], enemies: [], inventory: [], reservePage: 0, previousHp: new Map(),
+        formationLayers: [], reserveBackground: node(), reserveTitle: node(), reserveButtons: [
+            {backing: node(), arrow: node()}, {backing: node(), arrow: node()}
+        ], playback: {frames: [[sprite]], index: 0}, lastShotFrame: 0
+    });
+    view.render();
+    const entry = view.units.get('player:d1');
+    assert.equal(entry.aura.visible, false);
+    assert.equal(entry.selection.visible, false);
 });
