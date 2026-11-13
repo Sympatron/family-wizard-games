@@ -6,6 +6,7 @@ import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
 import {BattleView} from './battle/view.js';
+import {createRunnerHud} from './runner/hud.js';
 import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -280,12 +281,8 @@ async function beginRunner() {
     }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
-    const runnerHudText = document.createTextNode('');
-    const runnerCoinCounter = document.createElement('span');
-    runnerCoinCounter.id = 'runner-coin-counter';
-    runnerCoinCounter.className = 'dino-runner-coins';
-    runnerCoinCounter.textContent = 'Münzen 0';
-    hud.replaceChildren(runnerHudText, runnerCoinCounter);
+    const runnerHud = createRunnerHud(document);
+    hud.replaceChildren(runnerHud.root);
     help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Schieße auf Käfige und Tore; Magnet-Tore erhöhen die Münzreichweite.';
     try {
         const {startRunner} = await import('./runner/runner.js');
@@ -302,10 +299,7 @@ async function beginRunner() {
             message.textContent = paused ? 'Pausiert – mit Weiter oder P fortsetzen' : '';
         },
         onProgress: progress => {
-            runnerHudText.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
-                ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets + ' · Magnet ' + progress.temporary.pickupRange.toFixed(1) + ' · ';
-            runnerCoinCounter.textContent = 'Münzen ' + (progress.coins ?? 0);
+            runnerHud.update(progress);
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
@@ -334,6 +328,7 @@ function apply(snapshot) {
         stage.className = 'dino-stage ' + phase;
         if (pauseToggle) pauseToggle.hidden = phase !== 'runner';
         hud.classList.toggle('dino-stats-panel', phase === 'formation');
+        hud.classList.toggle('dino-runner-hud', phase === 'runner');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {
             cleanup();
             activePhase = phase;
