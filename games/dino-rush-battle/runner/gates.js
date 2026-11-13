@@ -1,7 +1,8 @@
 import {BASE_PICKUP_RANGE} from './coins.js';
 import {MAX_BULLETS, SHOT_INTERVAL_SECONDS} from './shots.js';
 export const GATE_PROPERTIES = ['damage', 'fireRate', 'bullets', 'pickupRange'];
-export const GATE_LANES = Object.freeze([-3.2, 0, 3.2]);
+export const GATE_LANES = Object.freeze([-3.2, 3.2]);
+export const GATE_WIDTH = 6.1;
 const bound = (value, low, high) => Math.max(low, Math.min(high, value));
 export function createGatePair(stage, pairIndex) {
     const first = (stage + pairIndex) % GATE_PROPERTIES.length;
@@ -13,7 +14,7 @@ export function createGatePair(stage, pairIndex) {
 }
 export function createSingleGate(stage, gateIndex) {
     return {modifier: GATE_PROPERTIES[(stage + gateIndex) % GATE_PROPERTIES.length], operation: 'add', level: 0,
-        single: true, x: GATE_LANES[(stage + gateIndex * 2) % GATE_LANES.length], width: 3.1};
+        single: true, x: GATE_LANES[(stage + Math.floor(gateIndex / 2)) % GATE_LANES.length], width: GATE_WIDTH};
 }
 export function gateValue(gate) {
     return gate.operation === 'multiply' ? 1 + gate.level * 0.25 : gate.level;
