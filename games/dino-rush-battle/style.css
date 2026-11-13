@@ -142,7 +142,7 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-runner-icon {display:block;width:23px;height:23px;flex:none;}
 .dino-runner-stat-time .dino-runner-icon {color:#cfedf6;}
 .dino-runner-stat-hp .dino-runner-icon {color:#ff9694;}
-.dino-runner-stat-dinos .dino-runner-icon {color:#a8e69d;}
+.dino-runner-stat-dinos .dino-runner-icon {width:32px;height:27px;object-fit:contain;filter:drop-shadow(0 1px 1px #0008);}
 .dino-runner-stat-damage .dino-runner-icon {color:#ffc48c;}
 .dino-runner-stat-fireRate .dino-runner-icon {color:#ffec8b;}
 .dino-runner-stat-bullets .dino-runner-icon {color:#add8fa;}
