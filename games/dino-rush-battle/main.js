@@ -1,7 +1,7 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, reduceGame} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
@@ -395,7 +395,8 @@ function apply(snapshot) {
     if (applying || (snapshot.revision === appliedRevision && snapshot.user.id === appliedUser)) return;
     applying = true;
     try {
-        state = snapshot;
+        state = {...snapshot, game: migrateGame(snapshot.game)};
+        snapshot = state;
         appliedRevision = snapshot.revision;
         appliedUser = snapshot.user.id;
         const phase = snapshot.game.run.phase;
