@@ -163,6 +163,7 @@ export function reduceGame(game, action) {
             const evolves = into !== a.species;
             const upgraded = {id: 'd' + run.nextId++, species: into, level: evolves ? 1 : a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};
             if (evolves && SPECIES[into].rank === 4) upgraded.trait = a.trait ?? SPECIES[a.species].trait;
+            else if (!evolves && (a.trait || b.trait)) upgraded.trait = a.trait ?? b.trait;
             upgraded.hp = maxHp(upgraded, next.meta.upgrades);
             if (upgraded.cell === null) run.inventory.push(upgraded);
             else run.army.push(upgraded);
