@@ -49,6 +49,21 @@ test('runner shows absolute volley damage and actual attack rate, not multiplier
     hud.update({...progress, temporary: {...progress.temporary, damage: 2, fireRate: 2}});
     assert.equal(hud.root.children[3].children[1].textContent, '2.0');
     assert.equal(hud.root.children[4].children[1].textContent, '7.1/s');
-    assert.equal(hud.root.children[3].attributes['aria-label'], 'Schaden pro Schussserie: 2.0');
+    assert.equal(hud.root.children[3].attributes['aria-label'], 'Schaden pro Kugel: 2.0');
     assert.equal(hud.root.children[4].attributes['aria-label'], 'Schussserien pro Sekunde: 7.1/s');
+});
+
+test('HUD reports current absolute attack speed after additive and multiplicative upgrades', async () => {
+    const {applyGate} = await import('../games/dino-rush-battle/runner/gates.js');
+    const {SHOT_INTERVAL_SECONDS} = await import('../games/dino-rush-battle/runner/shots.js');
+    let temporary = {...progress.temporary, fireRate: 2.2 * SHOT_INTERVAL_SECONDS};
+    const hud = createRunnerHud(document);
+    hud.update({...progress, temporary});
+    assert.equal(hud.root.children[4].children[1].textContent, '2.2/s');
+    temporary = applyGate(temporary, {modifier: 'fireRate', operation: 'multiply', level: 4});
+    hud.update({...progress, temporary});
+    assert.equal(hud.root.children[4].children[1].textContent, '4.4/s');
+    temporary = applyGate(temporary, {modifier: 'fireRate', operation: 'add', level: 4});
+    hud.update({...progress, temporary});
+    assert.equal(hud.root.children[4].children[1].textContent, '8.4/s');
 });
