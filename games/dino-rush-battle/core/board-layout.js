@@ -14,6 +14,10 @@ export function toBattleScreen(x, y, portrait) {
         : {x: 480 + (y - 198) * 1.5, y: 270 + (480 - x) * 0.85};
 }
 
+export function toCombatScreen(x, y, portrait) {
+    return {...toBattleScreen(x, y, portrait), y: 310 + (480 - x) * 0.72};
+}
+
 export function battleCellCenter(team, cell, portrait) {
     const depth = Math.floor(cell / 5);
     const lane = cell % 5;
