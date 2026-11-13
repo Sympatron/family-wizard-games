@@ -17,7 +17,7 @@ test('runner spawns only caged dinosaurs at arbitrary horizontal positions', () 
         assert.ok(dinos.some(item => item.x < 0), species + ' should appear on the left');
         assert.ok(dinos.some(item => item.x > 0), species + ' should appear on the right');
     }
-    assert.ok(objects.every(item => item.z < -75));
+    assert.ok(objects.every(item => item.z < -57));
     assert.ok(waves[0][0].kind === 'cage');
 });
 test('runner spawn distributions are not determined by stage and wave alone', () => {

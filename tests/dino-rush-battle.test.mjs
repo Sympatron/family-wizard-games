@@ -18,8 +18,8 @@ test('runner collection, formation, branch evolution and battle reward form a st
     assert.equal(game.run.inventory.length, 0);
     const pair = mergeOptions([...game.run.army, ...game.run.inventory]).find(item => item.species === 'raptor');
     assert.ok(pair);
-    game = apply(game, 'merge', {ids: pair.ids, into: 'troodon'});
-    assert.equal(game.run.army.filter(unit => unit.species === 'troodon').length, 1);
+    game = apply(game, 'merge', {ids: pair.ids, into: 'raptor'});
+    assert.equal(game.run.army.filter(unit => unit.species === 'raptor' && unit.level === 2).length, 1);
     assert.ok(!game.run.army.some(unit => pair.ids.includes(unit.id)));
     game = apply(game, 'start-battle');
     assert.equal(game.run.phase, 'battle');
@@ -191,21 +191,21 @@ test('touch and mouse positions map to correct formation cell in scaled canvases
         }
     }
 });
-test('runner rewards retain a seven-projectile gate bonus', () => {
+test('runner upgrades are bounded to prevent runaway cage damage', () => {
     const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
-    assert.deepEqual(game.run.temporary, {damage: 6, fireRate: 6, bullets: 7});
+    assert.deepEqual(game.run.temporary, {damage: 3, fireRate: 2.5, bullets: 5});
 });
 
-test('same-species same-level drops provide two evolution branches', () => {
+test('equal species merge to the next mastery tier before branching', () => {
     const game = apply(fresh(), 'complete-runner', {collected: ['raptor', 'raptor']});
     const [target, source] = game.run.army.filter(unit => unit.species === 'raptor').slice(0, 2);
-    assert.deepEqual(getMergeChoices(source, target), ['allosaurus', 'troodon']);
+    assert.deepEqual(getMergeChoices(source, target), ['raptor']);
     assert.deepEqual(getMergeChoices(target, target), []);
     assert.deepEqual(getMergeChoices({...source, level: 2}, target), []);
     assert.deepEqual(getMergeChoices({...source, species: 'triceratops'}, target), []);
-    const upgraded = apply(game, 'merge', {ids: [target.id, source.id], into: 'troodon'});
+    const upgraded = apply(game, 'merge', {ids: [target.id, source.id], into: 'raptor'});
     assert.equal(upgraded.run.army.length, game.run.army.length - 1);
-    const evolved = upgraded.run.army.find(unit => unit.species === 'troodon');
+    const evolved = upgraded.run.army.find(unit => unit.species === 'raptor' && unit.level === 2);
     assert.ok(evolved);
     assert.equal(evolved.cell, target.cell);
     assert.equal(evolved.level, 2);
@@ -223,4 +223,12 @@ test('coins collected during runner add to in-run money and reject invalid rewar
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: -1}));
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: 1.25}));
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [], coins: 10000}));
+});
+
+test('rare cages rescue evolved species and reinforced cages rescue Tier II', () => {
+    const game = apply(fresh(), 'complete-runner', {collected: [{species: 'allosaurus', level: 1}, {species: 'triceratops', level: 2}]});
+    assert.equal(game.run.army.find(unit => unit.species === 'allosaurus').level, 1);
+    assert.equal(game.run.army.find(unit => unit.species === 'triceratops').level, 2);
+    assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'tyrannosaurus', level: 1}]}));
+    assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'raptor', level: 4}]}));
 });

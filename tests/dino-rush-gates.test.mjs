@@ -23,12 +23,12 @@ test('negative gates become positive after repeated shooting', () => {
 test('additive and multiplicative modifiers accumulate independently', () => {
     const base = {damage: 1, fireRate: 1, bullets: 1};
     const add = applyGate(base, {modifier: 'damage', operation: 'add', level: 2});
-    assert.equal(add.damage, 2);
+    assert.equal(add.damage, 1.6);
     const multiply = applyGate(add, {modifier: 'damage', operation: 'multiply', level: 4});
-    assert.equal(multiply.damage, 4);
+    assert.equal(multiply.damage, 3);
     assert.equal(base.damage, 1);
     assert.equal(applyGate(base, {modifier: 'bullets', operation: 'add', level: 3}).bullets, 4);
-    assert.equal(applyGate({damage: 1, fireRate: 1, bullets: 4}, {modifier: 'bullets', operation: 'multiply', level: 2}).bullets, 6);
+    assert.equal(applyGate({damage: 1, fireRate: 1, bullets: 4}, {modifier: 'bullets', operation: 'multiply', level: 2}).bullets, 5);
     assert.equal(applyGate(base, {modifier: 'fireRate', operation: 'multiply', level: -2}).fireRate, 0.5);
     assert.equal(applyGate(base, {modifier: 'damage', operation: 'multiply', level: -2}).damage, 0.5);
     assert.throws(() => applyGate(base, {modifier: 'unknown', operation: 'add', level: 2}));

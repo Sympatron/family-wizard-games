@@ -10,7 +10,7 @@ const run = () => ({
 
 test('dropping reserves onto matching reserves offers both evolutions', () => {
     assert.deepEqual(resolveFormationDrop(run(), 'd3', {reserve: true, unitId: 'd4'}),
-        {type: 'merge-choice', ids: ['d4', 'd3'], choices: ['allosaurus', 'troodon']});
+        {type: 'merge-choice', ids: ['d4', 'd3'], choices: ['raptor']});
 });
 test('merging reserves and deployed dinosaurs works in both directions', () => {
     assert.deepEqual(resolveFormationDrop(run(), 'd3', {cell: 0, unitId: 'd1'}).ids, ['d1', 'd3']);

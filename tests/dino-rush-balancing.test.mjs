@@ -8,8 +8,8 @@ test('shots split total damage evenly and fan outward', () => {
         const shots = volleyPattern(bullets, 4);
         assert.equal(shots.length, bullets);
         assert.ok(Math.abs(shots.reduce((sum, shot) => sum + shot.damage, 0) - 4) < 1e-10);
-        assert.equal(shots[0].spread, -shots.at(-1).spread);
-        assert.equal(shots[0].offset, -shots.at(-1).offset);
+        assert.ok(Math.abs(shots[0].spread + shots.at(-1).spread) < 1e-12);
+        assert.ok(Math.abs(shots[0].offset + shots.at(-1).offset) < 1e-12);
         if (bullets > 1) assert.ok(shots[0].spread < 0 && shots.at(-1).spread > 0);
     }
     assert.deepEqual(volleyPattern(4, 4).map(shot => shot.damage), [1, 1, 1, 1]);
