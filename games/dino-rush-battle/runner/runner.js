@@ -430,19 +430,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 flight.group.rotation.y += dt * 10;
                 flight.group.scale.setScalar(1 - Math.min(1, flight.elapsed / COIN_ATTRACT_SECONDS) * 0.55);
                 if (flight.elapsed >= COIN_ATTRACT_SECONDS) {
-                    const origin = projectCoinToHost(flight.group.position);
-                    disposeGroup(flight.group);
-                    flight.group = null;
                     flight.phase = 'counter';
                     flight.elapsed = 0;
-                    flight.origin = origin;
-                    flight.element = document.createElement('span');
-                    flight.element.className = 'dino-coin-flight';
-                    flight.element.textContent = String(flight.value);
-                    flight.element.style.left = origin.x + 'px';
-                    flight.element.style.top = origin.y + 'px';
-                    flight.element.style.transform = 'translate(-50%, -50%)';
-                    host.append(flight.element);
+                    flight.origin = projectCoinToHost(flight.group.position);
                 }
                 continue;
             }
@@ -453,11 +443,16 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 : {x: host.clientWidth / 2, y: 25};
             const point = interpolateCoinFlight(flight.origin, destination, flight.elapsed, COIN_COUNTER_SECONDS);
             const progress = Math.min(1, flight.elapsed / COIN_COUNTER_SECONDS);
-            flight.element.style.left = point.x + 'px';
-            flight.element.style.top = point.y + 'px';
-            flight.element.style.transform = 'translate(-50%, -50%) scale(' + (1 - 0.55 * progress) + ')';
+            const canvasRect = renderer.domElement.getBoundingClientRect();
+            const x = (hostRect.left + point.x - canvasRect.left) / canvasRect.width * 2 - 1;
+            const y = 1 - (hostRect.top + point.y - canvasRect.top) / canvasRect.height * 2;
+            const world = new THREE.Vector3(x, y, 0.4).unproject(camera);
+            const worldPerPixel = 2 * world.distanceTo(camera.position) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / canvasRect.height;
+            flight.group.position.copy(world);
+            flight.group.quaternion.copy(camera.quaternion);
+            flight.group.scale.setScalar(worldPerPixel * 28 / 1.28 * (1 - 0.3 * progress));
             if (progress >= 1) {
-                flight.element.remove();
+                disposeGroup(flight.group);
                 displayCoins += flight.value;
                 coinFlights.splice(i, 1);
             }
@@ -759,10 +754,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         window.removeEventListener('keyup', keyUp);
         document.removeEventListener('visibilitychange', visibilityChange);
         for (const obj of [...objects]) removeObject(obj);
-        for (const flight of coinFlights) {
-            flight.element?.remove();
-            if (flight.group) disposeGroup(flight.group);
-        }
+        for (const flight of coinFlights) disposeGroup(flight.group);
         coinFlights.length = 0;
         gateGuide.remove();
         for (const bullet of bullets) {
