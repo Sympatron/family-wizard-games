@@ -192,7 +192,9 @@ test('dragging greys out nonmergeable dinosaurs and enemies, while matching tier
     }
     const origin = view.cellCenter('player', starter.cell);
     send('pointerdown', origin);
-    assert.equal(view.units.get('player:d3').container.alpha, undefined, 'selection alone must not dim units');
+    assert.equal(view.units.get('player:d3').container.alpha, 0.28, 'incompatible units dim immediately on pointer down');
+    assert.equal(view.units.get('reserve:d4').container.alpha, 0.28, 'incompatible reserve units also dim on pointer down');
+    assert.equal(view.units.get('player:d2').container.alpha, 1, 'mergeable units stay fully visible');
     send('pointermove', {x: origin.x + 30, y: origin.y});
     for (const key of ['player:d1', 'player:d2', 'reserve:d5']) {
         assert.equal(view.units.get(key).container.alpha, 1, key + ' should remain clear');
@@ -230,4 +232,5 @@ test('battle rendering hides the colored tier auras and selection ellipses', () 
     const entry = view.units.get('player:d1');
     assert.equal(entry.aura.visible, false);
     assert.equal(entry.selection.visible, false);
+    assert.equal(entry.container.alpha, 1, 'living dinos remain opaque during combat');
 });
