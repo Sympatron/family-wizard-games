@@ -134,6 +134,28 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-gate-guide .negative {border-color:#ff9387;color:#ffd2ca;}
 @media (max-width:650px) {.dino-gate-guide {top:118px;gap:5px;}.dino-gate-guide span {padding:5px 4px;font-size:.71rem;}}
 
-.dino-runner-coins {display:inline-block;padding:3px 8px;border-radius:10px;background:#263f4be8;border:1px solid #ebc568;color:#ffe7a5;font-weight:850;white-space:nowrap;text-shadow:0 1px 3px #101820;}
-.dino-coin-flight {position:absolute;z-index:15;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:3px solid #ffe59c;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3af,#e3a73b 70%,#99601b);color:#503514;font-size:15px;font-weight:900;box-shadow:0 0 12px #ffc54b88,0 2px 6px #0009;pointer-events:none;will-change:transform,left,top;}
-@media(max-width:650px) {.dino-runner-coins {padding:2px 5px;}.dino-coin-flight {width:29px;height:29px;font-size:13px;}}
+
+#hud.dino-runner-hud {position:relative;z-index:4;padding:2px 8px;text-shadow:none;}
+.dino-runner-stat-strip {display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;width:100%;max-width:900px;margin:0 auto;}
+.dino-runner-stat {display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:60px;height:38px;box-sizing:border-box;padding:4px 9px;border:1px solid #6b8790;border-radius:11px;background:linear-gradient(160deg,#294653ee,#142936f5);box-shadow:0 3px 8px #08182188;color:#eff8eb;}
+.dino-runner-stat strong {font-size:clamp(.83rem,1.35vw,1.1rem);font-variant-numeric:tabular-nums;white-space:nowrap;}
+.dino-runner-icon {display:block;width:23px;height:23px;flex:none;}
+.dino-runner-stat-time .dino-runner-icon {color:#cfedf6;}
+.dino-runner-stat-hp .dino-runner-icon {color:#ff9694;}
+.dino-runner-stat-dinos .dino-runner-icon {color:#a8e69d;}
+.dino-runner-stat-damage .dino-runner-icon {color:#ffc48c;}
+.dino-runner-stat-fireRate .dino-runner-icon {color:#ffec8b;}
+.dino-runner-stat-bullets .dino-runner-icon {color:#add8fa;}
+.dino-runner-stat-pickupRange .dino-runner-icon {color:#b69cfa;}
+.dino-runner-stat-coins {border-color:#edbf57;background:linear-gradient(160deg,#71502cd9,#2f302ce9);}
+.dino-runner-stat-coins .dino-runner-icon {color:#f6d779;}
+.dino-stage.runner #message {top:136px;}
+.dino-stage.runner .dino-gate-guide {top:198px;}
+@media(max-width:650px) {
+  .dino-runner-stat-strip {gap:4px;}
+  .dino-runner-stat {height:32px;min-width:58px;padding:3px 6px;gap:4px;border-radius:8px;}
+  .dino-runner-icon {width:19px;height:19px;}
+  .dino-runner-stat strong {font-size:.79rem;}
+  .dino-stage.runner #message {top:125px;}
+  .dino-stage.runner .dino-gate-guide {top:190px;}
+}
