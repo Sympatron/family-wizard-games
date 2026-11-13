@@ -292,7 +292,6 @@ function formation() {
     const row = document.createElement('div');
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
-    addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
     addButton(row, 'Entwicklungsbaum', showEvolutionTree);
     actions.append(row);
 }
