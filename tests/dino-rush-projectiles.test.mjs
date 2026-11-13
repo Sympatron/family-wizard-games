@@ -10,7 +10,7 @@ test('opposing armies begin with a larger gap before approaching', () => {
     const initial = result.frames[0];
     const player = initial.find(unit => unit.team === 'player');
     const enemy = initial.find(unit => unit.team === 'enemy');
-    assert.ok(enemy.x - player.x >= 300, 'armies must start at least 300 virtual units apart');
+    assert.ok(enemy.x - player.x >= 680, 'armies must start at least 680 virtual units apart');
     assert.ok(Math.abs(enemy.y - player.y) < 1);
 });
 
