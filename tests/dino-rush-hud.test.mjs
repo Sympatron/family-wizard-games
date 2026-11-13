@@ -17,10 +17,16 @@ test('runner HUD shows eight labeled icons with numerical values rather than tex
     assert.equal(hud.counter.id, 'runner-coin-counter');
     for (const item of hud.root.children) {
         const [icon, value] = item.children;
-        assert.equal(icon.tagName, 'svg');
         assert.equal(icon.attributes['aria-hidden'], 'true');
-        assert.equal(icon.attributes.viewBox, '0 0 24 24');
-        assert.ok(icon.children.length > 0);
+        if (icon.tagName === 'img') {
+            assert.equal(item.title, 'Dinos');
+            assert.equal(icon.src, './assets/dinos/raptor.svg');
+            assert.equal(icon.alt, '');
+        } else {
+            assert.equal(icon.tagName, 'svg');
+            assert.equal(icon.attributes.viewBox, '0 0 24 24');
+            assert.ok(icon.children.length > 0);
+        }
         assert.ok(value.textContent.length > 0);
         assert.ok(item.attributes['aria-label'].includes(value.textContent));
     }
