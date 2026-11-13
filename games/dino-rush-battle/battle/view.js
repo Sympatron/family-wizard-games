@@ -66,7 +66,7 @@ export class BattleView {
             drawBattlefield(terrain.context);
             terrain.refresh();
         }
-        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(width, 620).setDepth(-10);
+        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(960, 620).setDepth(-10);
         const background = scene.add.graphics().setDepth(-4);
         background.fillStyle(0x223c36, 0.68);
         background.fillRoundedRect(8, 328, sidebar.left - 16, 174, 15);
