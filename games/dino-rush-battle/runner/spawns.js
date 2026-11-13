@@ -24,7 +24,7 @@ export function createRunnerWave(wave, stage, random = Math.random) {
             kind: 'cage', rarity, species, level: rarity === 'reinforced' ? 2 : 1,
             hp: cageHitPoints(stage, rarity),
             x: -4.9 + random() * 9.8,
-            z: -72 - index * 6 - random() * 8
+            z: -58 - index * 6 - random() * 8
         };
     });
 }

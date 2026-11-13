@@ -8,5 +8,5 @@ export function makeCoinWave(random = Math.random) {
     });
 }
 export function crossedCoin(playerX, playerZ, previousZ, currentZ, coinX) {
-    return previousZ <= playerZ && currentZ >= playerZ && Math.abs(playerX - coinX) <= 1.05;
+    return previousZ <= playerZ && currentZ >= playerZ && Math.abs(playerX - coinX) <= 1.8;
 }

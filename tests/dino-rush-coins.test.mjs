@@ -26,3 +26,9 @@ test('coins collect exactly once when crossing the player within reach', () => {
     assert.equal(crossedCoin(0.5, 8, 8.3, 8.7, 0.2), false);
     assert.equal(crossedCoin(0.5, 8, 7.1, 7.8, 0.2), false);
 });
+
+test('coins have a generous collection radius without collecting across the road', () => {
+    assert.equal(crossedCoin(1.7, 8, 7.6, 8.3, 0), true);
+    assert.equal(crossedCoin(-1.7, 8, 7.6, 8.3, 0), true);
+    assert.equal(crossedCoin(1.9, 8, 7.6, 8.3, 0), false);
+});
