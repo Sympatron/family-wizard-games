@@ -3,12 +3,16 @@ import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt} from '../cor
 import {createHitSound} from '../core/hit-sound.js';
 
 const Phaser = window.Phaser;
+export const MASTERY_APPEARANCE = Object.freeze([
+    {width: 60, height: 48, halo: 0x285c4e, border: 0x83e7b4, label: '#b8f6d5'},
+    {width: 68, height: 55, halo: 0x264c85, border: 0x75bfff, label: '#a5d8ff'},
+    {width: 77, height: 63, halo: 0x684276, border: 0xffd071, label: '#ffe3a1'}
+]);
 export class BattleView {
-    constructor(host, {onCell, onSelect, onDrop}) {
+    constructor(host, {onSelect, onDrop}) {
         if (!Phaser) throw new Error('Die 2D-Spielengine konnte nicht geladen werden.');
         this.host = host;
         this.portrait = host.clientWidth < 620;
-        this.onCell = onCell;
         this.onSelect = onSelect;
         this.onDrop = onDrop;
         this.army = [];
@@ -215,11 +219,6 @@ export class BattleView {
         if (cancelled || this.mode !== 'formation') return;
         if (!drag.moved) {
             if (drag.id) this.onSelect(drag.id);
-            else {
-                const point = this.pointAtClient(event.clientX, event.clientY);
-                const cell = point ? this.cellAt(point.x, point.y) : null;
-                if (cell !== null) this.onCell(cell);
-            }
             return;
         }
         if (drag.id) {
@@ -328,16 +327,21 @@ export class BattleView {
     createUnit(unit) {
         const scene = this.scene;
         const container = scene.add.container(unit.x, unit.y).setDepth(1);
-        const shadow = scene.add.ellipse(0, 18, 46, 18, 0x101c23, 0.5);
-        const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(67, 54);
-        const selection = scene.add.ellipse(0, -7, 72, 58, 0xffef8a, 0).setStrokeStyle(0, 0xffef8a);
-        const mastery = scene.add.text(0, -37, 'R' + SPECIES[unit.species].rank + ' · T' + (unit.level ?? 1), {
-            fontFamily: 'system-ui', fontSize: '11px', fontStyle: 'bold',
-            color: unit.team === 'enemy' ? '#ffcbaa' : '#d6f3d7'
+        const tier = Math.max(1, Math.min(3, unit.level ?? 1));
+        const appearance = MASTERY_APPEARANCE[tier - 1];
+        const shadow = scene.add.ellipse(0, 18, appearance.width * 0.76, 18, 0x101c23, 0.5);
+        const aura = scene.add.ellipse(0, -8, appearance.width + 7, appearance.height + 7, appearance.halo, 0.55)
+            .setStrokeStyle(3, appearance.border, 0.95);
+        const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(appearance.width, appearance.height);
+        const selection = scene.add.ellipse(0, -8, appearance.width + 15, appearance.height + 15, 0xffef8a, 0)
+            .setStrokeStyle(0, 0xffef8a);
+        const mastery = scene.add.text(0, -43, 'R' + SPECIES[unit.species].rank + ' · T' + tier, {
+            fontFamily: 'system-ui', fontSize: '13px', fontStyle: 'bold', color: appearance.label,
+            stroke: '#10202b', strokeThickness: 3
         }).setOrigin(0.5);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, selection, sprite, mastery, healthBack, health]);
+        container.add([shadow, aura, selection, sprite, mastery, healthBack, health]);
         const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
@@ -351,7 +355,7 @@ export class BattleView {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
         }
-        this.hint.setText(isFormation ? 'Dino wählen oder ziehen' : 'KAMPF LÄUFT ...');
+        this.hint.setText(isFormation ? 'Drag & Drop: bewegen oder fusionieren' : 'KAMPF LÄUFT ...');
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
         }
