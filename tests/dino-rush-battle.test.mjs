@@ -193,7 +193,7 @@ test('touch and mouse positions map to correct formation cell in scaled canvases
 });
 test('runner upgrades are bounded to prevent runaway cage damage', () => {
     const game = apply(fresh(), 'complete-runner', {collected: [], temporary: {damage: 6, fireRate: 6, bullets: 7}});
-    assert.deepEqual(game.run.temporary, {damage: 3, fireRate: 2.5, bullets: 5});
+    assert.deepEqual(game.run.temporary, {damage: 3, fireRate: 2.5, bullets: 5, pickupRange: 1.8});
 });
 
 test('equal species merge to the next mastery tier before branching', () => {
@@ -231,4 +231,13 @@ test('rare cages rescue evolved species and reinforced cages rescue Tier II', ()
     assert.equal(game.run.army.find(unit => unit.species === 'triceratops').level, 2);
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'tyrannosaurus', level: 1}]}));
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'raptor', level: 4}]}));
+});
+
+test('temporary magnet radius is saved for the stage and resets next stage', () => {
+    let game = apply(fresh(), 'complete-runner', {collected: [], temporary: {pickupRange: 6}});
+    assert.equal(game.run.temporary.pickupRange, 4.5);
+    game = apply(game, 'start-battle');
+    game = apply(game, 'resolve-battle', {winner: 'player', survivors: game.run.army.map(unit => ({id: unit.id, hp: unit.hp}))});
+    game = apply(game, 'next-stage');
+    assert.equal(game.run.temporary.pickupRange, 1.8);
 });
