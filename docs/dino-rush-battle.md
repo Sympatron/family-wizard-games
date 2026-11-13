@@ -1,6 +1,6 @@
 # Dino Rush — Game Design and Implementation Plan
 
-Status: **design agreed at a high level; mechanics and balancing intentionally open**.
+Status: **playable prototype with merge-based progression and first balancing pass; live device playtesting remains outstanding**.
 
 ## 1. Goal and audience
 
@@ -34,7 +34,7 @@ The player should feel that runner performance affects army quality, while forma
 | Dino acquisition | Shoot **cages/obstacles** to free collectible dinosaurs (not directly shoot dinos to collect them) |
 | Battle presentation | 2D initially |
 | Grids | Player and enemy each have a **3×5** formation grid |
-| Evolution | **Two identical dinos of the same level** merge into **one stronger, different species**; the player chooses between two evolution branches |
+| Evolution | **Two identical dinosaurs of the same species and tier** merge to Tier II or III; two Tier III units evolve to a new Rank +1 species at Tier I. |
 | Combat | Melee units move toward opponents; ranged units fight at distance; support special abilities, area damage and status effects |
 | Combat control | Press Start and watch an **automatic battle** until one side is eliminated |
 | Injuries | Surviving dinosaurs **regenerate some HP after battle**; healing potions accelerate recovery; knocked-out dinos need revival/healing per the eventual potion rules |
@@ -50,7 +50,7 @@ The player should feel that runner performance affects army quality, while forma
 These are **not blockers for the first vertical slice** and should be data-driven, with temporary placeholder values:
 
 - Whether all 15 cells may be occupied, exact inventory limits, and any reserve area.
-- Initial species list, classes, dinosaur statistics, rarity, and exact evolution tree.
+- Further tuning of the defined 27-species roster, rarity weights, and battle stats.
 - Detailed targeting priorities, ability activation (energy vs cooldown), enemy AI, status effects and special ability roster.
 - Exact potion types, prices, revival behavior and rate of post-battle recovery.
 - Economy scaling, meta currency formula, permanent upgrade trees, unlocks and difficulty curves.
@@ -180,7 +180,7 @@ A prototype should use simple meshes/sprites and deliberately few species. Prefe
 
 - Add **focused** Node tests for phase transitions, merging/branch choice, formation legality, combat outcomes, HP recovery, run loss, currency conservation and persistence.
 - Browser-check keyboard, touch/drag steering, resizing, pause/restart, WebGL support, frame rate, visibility/background behavior and reload checkpoints.
-- Execute `npm run build` plus relevant local tests. Current CI deliberately gates only the static build; do not add new CI gates without an explicit request.
+- Execute `npm run build` plus relevant local tests. Current PR CI runs the Node test suite and the static build; keep new tests scoped to this game.
 - Work via focused branches and PRs. Merge only after required checks have passed and mergeability is verified.
 - Stable URL: `https://sympatron.github.io/family-wizard-games/`; dev preview under `preview/`. Both snapshots must use relative paths.
 - Check Pages after merge; opening a PR alone does not deploy the game.
@@ -196,3 +196,42 @@ A prototype should use simple meshes/sprites and deliberately few species. Prefe
 ## 9. Open design principle
 
 Build *behavior first, balance second*: use editable definitions for unit types, modifiers, evolution branches, stages, healing and meta upgrades, so detailed decisions can be made from a real playable prototype rather than further questionnaires.
+
+
+## 10. Expanded evolution and first balancing pass
+
+The roster contains **27 species** across ranks I–IV (3 / 6 / 12 / 6) and **three mastery tiers per species**. Upgrading tiers only requires merging **two dinosaurs of the same species and tier**, never money. Merging two Tier III units advances to a Rank +1 species at Tier I. At Rank IV, dinosaurs can still gain mastery tiers but cannot evolve to Rank V.
+
+Families:
+- Raptor → Allosaurus / Troodon → Carnotaurus / Giganotosaurus or Dilophosaurus / Deinonychus → Tyrannosaurus or Utahraptor
+- Triceratops → Ankylosaurus / Stegosaurus → Euoplocephalus / Saichania or Kentrosaurus / Miragaia → Borealopelta or Dacentrurus
+- Pteranodon → Quetzalcoatlus / Tapejara → Hatzegopteryx / Arambourgiania or Tupandactylus / Caiuajara → Thanatosdrakon or Thalassodromeus
+
+Each pair of Rank III branches converges to an apex species, which inherits the previous species' passive trait. Without higher-tier rescues, a Rank IV Tier I requires **512 Rank I Tier I starters**, and Rank IV Tier III requires 2,048. Wild higher-tier rescues make this a difficult long-term progression goal rather than a fixed number of runs.
+
+### Runner tuning
+
+| Setting | Implemented value |
+| --- | --- |
+| Runner | 35 seconds; finish line arrives as the timer reaches zero |
+| Cage density | About 9 reachable early cages instead of dozens |
+| Common cage | Rank I Tier I; stage-dependent HP |
+| Reinforced cage | Stage 3+; Rank I Tier II; 2.2× common HP |
+| Rare cage | Stage 8+; Rank II, or Rank III from stage 25 |
+| Rare mastery | Tier II from stage 10, Tier III from stage 45 |
+| Preferred species | Up to 55% of eligible rare spawns favor species already owned |
+| Cage HP | 5 + ceil(min(stage, 30) × 0.52); rare HP capped at 65 |
+| Runner damage | Max 3 total damage per volley |
+| Firing speed | Max 2.5×; at most 5 projectiles |
+| Multi-shot | Total damage split equally, with each projectile spread slightly outward |
+| Coin collection | Larger 1.8-world-unit pickup radius; 1/5/10 coin values |
+
+No hard dinosaur rescue cap; the smaller number of breakable cages and target selection provide the intended collection limit.
+
+### Combat and persistence
+
+Opposing front lines begin 460 virtual units apart and move more quickly during the initial approach. Enemy size, mastery tier and ranks increase across stages. Mastery scales power by 1.8 per tier, with an additional rank multiplier; abilities include poison, bleeding, armor, reflection, counterattacks, evasion, piercing, cleave, healing, support, fast attacks, burst, and stun. All 27 species have SVG battle illustrations and distinct low-poly runner variants.
+
+Saved state version 2 migrates existing version 1 dinosaur mastery levels without changing the game ID, unit IDs, or formation positions. All in-game currencies remain unrelated to real Family Wizard task coins.
+
+**Testing:** Rules, drops, rarity, projectile damage, and progression have automated tests. Full visual and real-device gameplay verification remains outstanding.
