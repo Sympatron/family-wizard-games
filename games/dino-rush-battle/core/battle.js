@@ -3,7 +3,7 @@ import {SPECIES, maxHp} from './game.js';
 const TICK = 0.1;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const snapshot = (units, shots = []) => {
-    const frame = units.map(u => ({id: u.id, team: u.team, species: u.species, x: u.x, y: u.y, hp: Math.max(0, u.hp), maxHp: u.maxHp, stunned: u.stunned > 0}));
+    const frame = units.map(u => ({id: u.id, team: u.team, species: u.species, level: u.level, x: u.x, y: u.y, hp: Math.max(0, u.hp), maxHp: u.maxHp, stunned: u.stunned > 0}));
     frame.shots = shots;
     return frame;
 };
@@ -91,7 +91,7 @@ function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
     const lane = unit.cell % 5;
     const unitMax = team === 'player' ? maxHp(unit, upgrades) : Math.max(1, unit.hp);
     return {
-        id: unit.id, team, species: unit.species,
+        id: unit.id, team, species: unit.species, level: unit.level,
         x: team === 'player' ? 250 - depth * 27 : 710 + depth * 27,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,

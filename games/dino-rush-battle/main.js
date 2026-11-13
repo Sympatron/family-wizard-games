@@ -243,7 +243,12 @@ function renderFormationStats(unit, run) {
     avatar.width = 56;
     avatar.height = 46;
     const identity = make('div', 'dino-stat-identity');
-    identity.append(make('strong', '', type.name), make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role));
+    const traitNames = {bleed: 'Blutung', stun: 'Betäubung', evasion: 'Ausweichen', burst: 'Kritischer Treffer',
+        rapid: 'Schnellangriff', armor: 'Panzerung', counter: 'Gegenangriff', pierce: 'Durchschlag',
+        support: 'Unterstützung', cleave: 'Flächenschaden', poison: 'Gift', reflect: 'Reflexion', heal: 'Heilung'};
+    identity.append(make('strong', '', type.name),
+        make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role),
+        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
     const health = make('div', 'dino-stat-health');
     health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));

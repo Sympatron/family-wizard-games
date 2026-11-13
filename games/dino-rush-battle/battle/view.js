@@ -117,7 +117,7 @@ export class BattleView {
         const visible = this.inventory.slice(from, from + this.reservePageSize);
         const firstX = (this.width - (visible.length - 1) * 59) / 2;
         return visible.map((unit, index) => ({
-            id: unit.id, team: 'reserve', species: unit.species, x: firstX + index * 59, y: 568,
+            id: unit.id, team: 'reserve', species: unit.species, level: unit.level, x: firstX + index * 59, y: 568,
             hp: unit.hp, maxHp: maxHp(unit, this.upgrades)
         }));
     }
@@ -277,12 +277,12 @@ export class BattleView {
     formationUnits() {
         const player = this.army.map(unit => {
             const center = this.cellCenter('player', unit.cell);
-            return {id: unit.id, team: 'player', species: unit.species, x: center.x, y: center.y,
+            return {id: unit.id, team: 'player', species: unit.species, level: unit.level, x: center.x, y: center.y,
                 hp: unit.hp, maxHp: maxHp(unit, this.upgrades)};
         });
         const enemy = this.enemies.map(unit => {
             const center = this.cellCenter('enemy', unit.cell);
-            return {id: unit.id, team: 'enemy', species: unit.species, x: center.x, y: center.y,
+            return {id: unit.id, team: 'enemy', species: unit.species, level: unit.level, x: center.x, y: center.y,
                 hp: unit.hp, maxHp: unit.hp};
         });
         return [...player, ...enemy, ...this.reserveUnits()];
@@ -331,9 +331,13 @@ export class BattleView {
         const shadow = scene.add.ellipse(0, 18, 46, 18, 0x101c23, 0.5);
         const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(67, 54);
         const selection = scene.add.ellipse(0, -7, 72, 58, 0xffef8a, 0).setStrokeStyle(0, 0xffef8a);
+        const mastery = scene.add.text(0, -37, 'R' + SPECIES[unit.species].rank + ' · T' + (unit.level ?? 1), {
+            fontFamily: 'system-ui', fontSize: '11px', fontStyle: 'bold',
+            color: unit.team === 'enemy' ? '#ffcbaa' : '#d6f3d7'
+        }).setOrigin(0.5);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, selection, sprite, healthBack, health]);
+        container.add([shadow, selection, sprite, mastery, healthBack, health]);
         const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
