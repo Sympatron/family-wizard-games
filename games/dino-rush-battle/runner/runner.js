@@ -16,7 +16,7 @@ import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
 import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
-import {volleyPattern} from './shots.js';
+import {volleyPattern, initialRunnerWeaponStats} from './shots.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -175,7 +175,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         scene.add(follower);
         followers.push(follower);
     }
-    const temporary = {damage: 1 + (upgrades.runnerDamage ?? 0) * 0.12, fireRate: 1, bullets: 1};
+    const temporary = initialRunnerWeaponStats(upgrades);
     let remaining = DURATION;
     let elapsed = 0;
     let playerHp = 3;
