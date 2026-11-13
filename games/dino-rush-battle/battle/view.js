@@ -1,6 +1,7 @@
 import {SPECIES, maxHp, getMergeChoices} from '../core/game.js';
 import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt, reserveSidebar, reserveUnitPosition} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
+import {battlefieldCover} from './background-layout.js';
 
 const Phaser = window.Phaser;
 export const MASTERY_APPEARANCE = Object.freeze([
@@ -61,12 +62,16 @@ export class BattleView {
         const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
         const sidebar = reserveSidebar(this.portrait);
         const fieldCenter = sidebar.left / 2;
-        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(960, 620).setDepth(-10);
+        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDepth(-10);
+        this.battlefield.setScale(battlefieldCover(this.battlefield.width, this.battlefield.height, width, 620).scale);
+        this.planningBackground = scene.add.image(fieldCenter, 310, 'dino-battlefield').setDepth(-9);
+        this.planningBackground.setScale(battlefieldCover(this.planningBackground.width, this.planningBackground.height, sidebar.left, 620).scale);
+        this.planningMask = scene.make.graphics({x: 0, y: 0, add: false});
+        this.planningMask.fillStyle(0xffffff).fillRect(0, 0, sidebar.left, 620);
+        this.planningBackground.setMask(this.planningMask.createGeometryMask());
         const background = scene.add.graphics().setDepth(-4);
-        background.fillStyle(0x223c36, 0.68);
-        background.fillRoundedRect(8, 328, sidebar.left - 16, 174, 15);
-        background.fillStyle(0x483a3e, 0.7);
-        background.fillRoundedRect(8, 42, sidebar.left - 16, 174, 15);
+        background.fillStyle(0x142c23, 0.17);
+        background.fillRect(0, 0, sidebar.left, 620);
         const grid = scene.add.graphics().setDepth(-3);
         for (const team of ['player', 'enemy']) {
             for (let cell = 0; cell < 15; cell++) {
@@ -80,7 +85,7 @@ export class BattleView {
         this.formationLayers = [background, grid,
             scene.add.text(fieldCenter, 540, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#b4e4c4'}).setOrigin(0.5).setDepth(4),
             scene.add.text(fieldCenter, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#ffc49b'}).setOrigin(0.5).setDepth(4)];
-        this.reserveBackground = scene.add.rectangle(sidebar.center, 310, sidebar.width - 4, 610, 0x142a36, 0.95).setDepth(-2);
+        this.reserveBackground = scene.add.rectangle(sidebar.center, 310, sidebar.width, 620, 0x142a36, 1).setDepth(-2);
         this.reserveTitle = scene.add.text(sidebar.center, 25, '', {fontFamily: 'system-ui', fontSize: this.portrait ? '13px' : '17px', fontStyle: 'bold', color: '#d7e5f5'}).setOrigin(0.5).setDepth(3);
         this.reserveButtons = [-1, 1].map(direction => {
             const x = sidebar.center + direction * (this.portrait ? 28 : 42);
@@ -379,6 +384,8 @@ export class BattleView {
         if (!this.scene || this.destroyed) return;
         const frame = this.mode === 'formation' ? this.formationUnits() : this.playback?.frames[this.playback.index] ?? [];
         const isFormation = this.mode === 'formation';
+        this.battlefield?.setVisible(!isFormation);
+        this.planningBackground?.setVisible(isFormation);
         if (!isFormation && this.playback && this.playback.index !== this.lastShotFrame) {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
@@ -434,6 +441,7 @@ export class BattleView {
         this.destroyed = true;
         this.playback = null;
         this.hitSound?.dispose();
+        this.planningMask?.destroy();
         if (this.canvas) {
             this.canvas.removeEventListener('pointerdown', this.pointerDown);
             this.canvas.removeEventListener('pointermove', this.pointerMove);
