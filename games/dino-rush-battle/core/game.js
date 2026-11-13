@@ -1,6 +1,6 @@
 import {SPECIES, MAX_TIER} from './species.js';
-import {BASE_PICKUP_RANGE, MAX_PICKUP_RANGE} from '../runner/coins.js';
-import {MAX_RUNNER_DAMAGE} from '../runner/gates.js';
+import {BASE_PICKUP_RANGE} from '../runner/coins.js';
+
 export {SPECIES} from './species.js';
 export function migrateGame(game) {
     if (!game || game.version >= 2) return game;
@@ -107,10 +107,10 @@ export function reduceGame(game, action) {
             }
             const temporary = action.payload?.temporary ?? {};
             run.temporary = {
-                damage: Math.max(0.25, Math.min(MAX_RUNNER_DAMAGE, Number(temporary.damage) || 1)),
-                fireRate: Math.max(0.25, Math.min(2.5, Number(temporary.fireRate) || 1)),
+                damage: Math.max(0.25, Number(temporary.damage) || 1),
+                fireRate: Math.max(0.25, Number(temporary.fireRate) || 1),
                 bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1))),
-                pickupRange: Math.max(1, Math.min(MAX_PICKUP_RANGE, Number(temporary.pickupRange) || BASE_PICKUP_RANGE))
+                pickupRange: Math.max(1, Number(temporary.pickupRange) || BASE_PICKUP_RANGE)
             };
             const coins = action.payload?.coins ?? 0;
             if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');
