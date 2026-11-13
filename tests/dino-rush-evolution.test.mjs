@@ -69,3 +69,26 @@ test('saved Rank II dinosaurs migrate from legacy level two without losing the g
     assert.equal(next.version, 2);
     assert.equal(next.run.inventory[0].level, 1);
 });
+
+test('legacy saved health percentages survive conversion to the new rank curve', () => {
+    const old = structuredClone(INITIAL_GAME);
+    old.version = 1;
+    old.run.phase = 'formation';
+    const previousMaximum = Math.round(SPECIES.allosaurus.hp * 1.2);
+    old.run.army = [{id: 'd1', species: 'allosaurus', level: 2, hp: Math.floor(previousMaximum / 2), cell: 0}];
+    const migrated = migrateGame(old);
+    const dinosaur = migrated.run.army[0];
+    assert.equal(dinosaur.level, 1);
+    assert.ok(Math.abs(dinosaur.hp / maxHp(dinosaur) - 0.5) < 0.02);
+});
+test('an apex keeps the chosen branch trait while merging further mastery tiers', () => {
+    let game = ready();
+    game.run.army = [
+        {...unit('d1', 'tyrannosaurus', 1, 0), trait: 'cleave'},
+        {...unit('d2', 'tyrannosaurus', 1, 1), trait: 'cleave'}
+    ];
+    game.run.nextId = 3;
+    game = apply(game, 'merge', {ids: ['d1', 'd2'], into: 'tyrannosaurus'});
+    assert.equal(game.run.army[0].level, 2);
+    assert.equal(game.run.army[0].trait, 'cleave');
+});
