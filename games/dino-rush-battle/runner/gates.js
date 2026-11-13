@@ -23,7 +23,7 @@ export function gateLabel(gate) {
     if (!property || !['add', 'multiply'].includes(gate.operation)) throw new Error('Ungültiges Tor');
     if (gate.single && gate.level === 0) return property + ' SCHIESS!';
     const value = gateValue(gate);
-    return property + ' ' + (gate.operation === 'multiply' ? '×' + value.toFixed(2).replace(/0$/, '').replace(/\.$/, '') : (value >= 0 ? '+' : '') + value);
+    return property + ' ' + (gate.operation === 'multiply' ? '×' + Number(value.toFixed(2)) : (value >= 0 ? '+' : '') + value);
 }
 export function improveGate(gate) {
     return {...gate, level: bound(gate.level + 1, -2, 4)};
