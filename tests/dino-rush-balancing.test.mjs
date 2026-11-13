@@ -32,7 +32,7 @@ test('runner averages nine common cage encounters per early stage, with rare rew
 });
 
 test('permanent runner damage upgrades cannot bypass the weapon balance cap', () => {
-    assert.deepEqual(initialRunnerWeaponStats(), {damage: 1, fireRate: 1, bullets: 1});
+    assert.deepEqual(initialRunnerWeaponStats(), {damage: 1, fireRate: 1, bullets: 1, pickupRange: 1.8});
     assert.equal(initialRunnerWeaponStats({runnerDamage: 9999}).damage, 3);
     assert.equal(initialRunnerWeaponStats({runnerDamage: -10}).damage, 1);
     assert.equal(initialRunnerWeaponStats({runnerDamage: 1}).damage, 1.12);
