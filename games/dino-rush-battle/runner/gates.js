@@ -1,7 +1,7 @@
-import {BASE_PICKUP_RANGE, MAX_PICKUP_RANGE} from './coins.js';
+import {BASE_PICKUP_RANGE} from './coins.js';
+import {MAX_BULLETS, SHOT_INTERVAL_SECONDS} from './shots.js';
 export const GATE_PROPERTIES = ['damage', 'fireRate', 'bullets', 'pickupRange'];
 export const GATE_LANES = Object.freeze([-3.2, 0, 3.2]);
-export const MAX_RUNNER_DAMAGE = 256;
 const bound = (value, low, high) => Math.max(low, Math.min(high, value));
 export function createGatePair(stage, pairIndex) {
     const first = (stage + pairIndex) % GATE_PROPERTIES.length;
@@ -33,12 +33,9 @@ export function applyGate(temporary, gate) {
     const next = {...temporary};
     const current = next[gate.modifier] ?? (gate.modifier === 'pickupRange' ? BASE_PICKUP_RANGE : undefined);
     if (!Number.isFinite(current)) throw new Error('Ungültiger Bonus');
-    if (gate.operation === 'multiply') next[gate.modifier] = current * gateValue(gate);
-    else next[gate.modifier] = current + gate.level * (gate.modifier === 'bullets' || gate.modifier === 'damage' ? 1 : gate.modifier === 'pickupRange' ? 0.4 : 0.12);
-    if (gate.modifier === 'bullets') next.bullets = bound(Math.round(next.bullets), 1, 5);
-    else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100,
-        gate.modifier === 'pickupRange' ? 1 : 0.3,
-        gate.modifier === 'pickupRange' ? MAX_PICKUP_RANGE : gate.modifier === 'fireRate' ? 2.5 : gate.modifier === 'damage' ? MAX_RUNNER_DAMAGE : 5);
+    const amount = gate.operation === 'multiply' ? current * gateValue(gate) : current + gate.level * (gate.modifier === 'fireRate' ? SHOT_INTERVAL_SECONDS : 1);
+    if (!Number.isFinite(amount)) throw new Error('Ungültiger Bonus');
+    next[gate.modifier] = gate.modifier === 'bullets' ? bound(Math.round(amount), 1, MAX_BULLETS) : Math.max(gate.modifier === 'pickupRange' ? 1 : 0.25, amount);
     return next;
 }
 
