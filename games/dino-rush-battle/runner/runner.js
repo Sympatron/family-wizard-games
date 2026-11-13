@@ -50,7 +50,8 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
         const eyes = material(0xf5ae50);
         const pupil = material(0x13212c);
         const teeth = material(0xfff0d7);
-        const wings = def.role === 'Fernkampf' && (def.rank > 1 || species === 'pteranodon');
+        const wings = ['pteranodon', 'quetzalcoatlus', 'tapejara', 'hatzegopteryx', 'arambourgiania', 'tupandactylus',
+            'caiuajara', 'thanatosdrakon', 'thalassodromeus'].includes(species);
         const armored = def.role === 'Tank';
         function piece(geometry, mat, x, y, z, sx = 1, sy = 1, sz = 1) {
             const mesh = new THREE.Mesh(geometry, mat);
