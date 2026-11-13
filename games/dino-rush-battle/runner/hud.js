@@ -21,6 +21,31 @@ const ICONS = Object.freeze({
         ['path', {d: 'M12 6v12m3-9.5c-2.3-1.7-6-1-6 1.1 0 2.5 6 1 6 3.9 0 2.5-3.4 3-6 1.4', stroke: '#694317', 'stroke-width': 2}]]
 });
 
+export function paintRunnerStatIcon(ctx, kind, size = 128) {
+    const shapes = ICONS[kind];
+    if (!shapes) throw new Error('Unbekanntes Tor-Icon.');
+    ctx.save();
+    ctx.scale(size / 24, size / 24);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const [type, attributes] of shapes) {
+        ctx.strokeStyle = attributes.stroke ?? '#ffe4a2';
+        ctx.fillStyle = attributes.fill ?? 'transparent';
+        ctx.lineWidth = Number(attributes['stroke-width'] ?? 2);
+        if (type === 'path') {
+            const path = new Path2D(attributes.d);
+            if (attributes.fill && attributes.fill !== 'none') ctx.fill(path);
+            if (attributes.stroke !== 'none') ctx.stroke(path);
+        } else if (type === 'circle') {
+            ctx.beginPath();
+            ctx.arc(Number(attributes.cx), Number(attributes.cy), Number(attributes.r), 0, Math.PI * 2);
+            if (attributes.fill && attributes.fill !== 'none') ctx.fill();
+            if (attributes.stroke !== 'none') ctx.stroke();
+        }
+    }
+    ctx.restore();
+}
+
 function createIcon(doc, kind) {
     if (kind === 'dinos') {
         const image = doc.createElement('img');
