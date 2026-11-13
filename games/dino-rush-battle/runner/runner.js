@@ -23,7 +23,7 @@ import {volleyPattern, initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS} from './
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
+export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -184,7 +184,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         scene.add(follower);
         followers.push(follower);
     }
-    const temporary = initialRunnerWeaponStats(upgrades);
+    const temporary = initialRunnerWeaponStats(upgrades, gunUpgrades);
     let remaining = DURATION;
     let elapsed = 0;
     let playerHp = 3;
