@@ -17,7 +17,7 @@ import {makeCoinWave, crossedCoin} from './coins.js';
 import {COIN_ATTRACT_SECONDS, COIN_COUNTER_SECONDS, interpolateCoinFlight} from './coin-flight.js';
 import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
-import {volleyPattern, initialRunnerWeaponStats} from './shots.js';
+import {volleyPattern, initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS} from './shots.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -574,7 +574,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         shotTimer -= dt;
         if (shotTimer <= 0) {
             shoot();
-            shotTimer += 0.28 / temporary.fireRate;
+            shotTimer += SHOT_INTERVAL_SECONDS / temporary.fireRate;
         }
         const speed = 17 + Math.min(stage, 12) * 0.6;
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
