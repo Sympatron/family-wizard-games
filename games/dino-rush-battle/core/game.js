@@ -28,10 +28,16 @@ export function createRun() {
     };
 }
 export function getEnemies(stage) {
-    const types = ['raptor', 'triceratops', 'pteranodon'];
+    const starters = ['raptor', 'triceratops', 'pteranodon'];
+    const advanced = ['allosaurus', 'troodon', 'ankylosaurus', 'stegosaurus', 'quetzalcoatlus', 'tapejara'];
+    const elite = ['carnotaurus', 'dilophosaurus', 'euoplocephalus', 'kentrosaurus', 'hatzegopteryx', 'caiuajara'];
     return Array.from({length: Math.min(3 + stage, 12)}, (_, i) => {
-        const species = types[(i + stage) % types.length];
-        return {id: 'e' + i, species, level: 1, hp: Math.round(SPECIES[species].hp * (0.75 + stage * 0.11)), cell: i};
+        const species = stage >= 14 && i % 5 === 0 ? elite[(stage + i) % elite.length]
+            : stage >= 6 && i % 4 === 0 ? advanced[(stage + i) % advanced.length]
+            : starters[(i + stage) % starters.length];
+        const level = stage >= 12 && i % 3 === 0 ? 3 : stage >= 5 && i % 3 === 0 ? 2 : 1;
+        const unit = {id: 'e' + i, species, level, cell: i};
+        return {...unit, hp: Math.round(maxHp(unit) * (0.82 + stage * 0.035))};
     });
 }
 export function nextFreeCell(army, species) {
