@@ -1,3 +1,4 @@
+import {SHOT_INTERVAL_SECONDS} from './shots.js';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ICONS = Object.freeze({
     time: [['circle', {cx: 12, cy: 12, r: 9}], ['path', {d: 'M12 7v5l3.5 2.5'}]],
@@ -54,7 +55,7 @@ export function createRunnerHud(doc) {
         ['hp', 'Leben', progress => String(progress.hp)],
         ['dinos', 'Dinos', progress => String(progress.collected)],
         ['damage', 'Schaden pro Schussserie', progress => progress.temporary.damage.toFixed(1)],
-        ['fireRate', 'Schussserien pro Sekunde', progress => (progress.temporary.fireRate / 0.28).toFixed(1) + '/s'],
+        ['fireRate', 'Schussserien pro Sekunde', progress => (progress.temporary.fireRate / SHOT_INTERVAL_SECONDS).toFixed(1) + '/s'],
         ['bullets', 'Kugeln', progress => String(progress.temporary.bullets)],
         ['pickupRange', 'Magnet', progress => progress.temporary.pickupRange.toFixed(1)],
         ['coins', 'Münzen', progress => String(progress.coins ?? 0)]
