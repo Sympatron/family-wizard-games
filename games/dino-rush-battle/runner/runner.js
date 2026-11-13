@@ -5,7 +5,7 @@ try {
     THREE = await import('https://unpkg.com/three@0.187.0/build/three.module.js');
 }
 import {SPECIES as DINOSAURS} from '../core/game.js';
-import {createGatePair, createSingleGate, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
+import {createGatePair, createSingleGate, gateLabel, improveGate, applyGate, selectCrossedGate, GATE_LANES, GATE_WIDTH} from './gates.js';
 import {paintRunnerStatIcon} from './hud.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
@@ -269,7 +269,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         const [type, value] = gateLabel(obj).split(' ');
         const label = new THREE.Group();
         const accent = positive ? '#8bffe0' : obj.level < 0 ? '#ff998c' : '#ffec96';
-        const labelWidth = (obj.width ?? 6.1) - 0.2;
+        const labelWidth = (obj.width ?? GATE_WIDTH) - 0.2;
         label.add(gateText(type, 4.55, labelWidth, 1.25, 172, '#ffffff', accent));
         label.add(gateText(value, 2.1, labelWidth, 2.55, 225, '#fff4b6', accent));
         obj.label = label;
@@ -280,8 +280,8 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         const pairId = gateCount++;
         const definitions = pairId % 2 === 0 ? createGatePair(stage, pairId) : [createSingleGate(stage, pairId)];
         for (const [index, definition] of definitions.entries()) {
-            const x = definition.x ?? (index === 0 ? -3.2 : 3.2);
-            const width = definition.width ?? 6.1;
+            const x = definition.x ?? GATE_LANES[index];
+            const width = definition.width ?? GATE_WIDTH;
             const group = new THREE.Group();
             const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, 4.1), new THREE.MeshBasicMaterial({
                 color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide
