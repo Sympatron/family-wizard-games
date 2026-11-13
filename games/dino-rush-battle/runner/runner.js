@@ -30,6 +30,12 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer:coarse)').matches ? 1.5 : 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     host.replaceChildren(renderer.domElement);
+    const gateGuide = document.createElement('div');
+    gateGuide.className = 'dino-gate-guide';
+    gateGuide.hidden = true;
+    const gateChoices = [document.createElement('span'), document.createElement('span')];
+    gateGuide.append(...gateChoices);
+    host.append(gateGuide);
     scene.add(new THREE.HemisphereLight(0xd6f7ff, 0x354b39, 2.2));
     const sunlight = new THREE.DirectionalLight(0xffe6bd, 2.2);
     sunlight.position.set(-8, 18, 5);
@@ -413,6 +419,17 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             particles.push({mesh, life: 0.35, vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4, vz: (Math.random() - 0.5) * 6});
         }
     }
+    function updateGateGuide() {
+        const next = objects.filter(obj => obj.kind === 'gate' && obj.z < player.position.z - 3)
+            .sort((a, b) => b.z - a.z)[0];
+        const pair = next ? objects.filter(obj => obj.kind === 'gate' && obj.pairId === next.pairId)
+            .sort((a, b) => a.x - b.x) : [];
+        gateGuide.hidden = pair.length !== 2;
+        for (const [index, gate] of pair.entries()) {
+            gateChoices[index].textContent = (index === 0 ? 'LINKS · ' : 'RECHTS · ') + gateLabel(gate);
+            gateChoices[index].className = gate.level > 0 ? 'positive' : gate.level < 0 ? 'negative' : 'neutral';
+        }
+    }
     function collectGate(obj) {
         const previous = temporary[obj.modifier];
         Object.assign(temporary, applyGate(temporary, obj));
@@ -595,6 +612,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         }
         reportTimer -= dt;
         if (reportTimer <= 0) {
+            updateGateGuide();
             onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: runnerCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
