@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
+import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, MAX_RUNNER_DAMAGE, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
     for (let stage = 1; stage <= 8; stage++) {
@@ -23,9 +23,9 @@ test('negative gates become positive after repeated shooting', () => {
 test('additive and multiplicative modifiers accumulate independently', () => {
     const base = {damage: 1, fireRate: 1, bullets: 1};
     const add = applyGate(base, {modifier: 'damage', operation: 'add', level: 2});
-    assert.equal(add.damage, 1.6);
+    assert.equal(add.damage, 3);
     const multiply = applyGate(add, {modifier: 'damage', operation: 'multiply', level: 4});
-    assert.equal(multiply.damage, 3);
+    assert.equal(multiply.damage, 6);
     assert.equal(base.damage, 1);
     assert.equal(applyGate(base, {modifier: 'bullets', operation: 'add', level: 3}).bullets, 4);
     assert.equal(applyGate({damage: 1, fireRate: 1, bullets: 4}, {modifier: 'bullets', operation: 'multiply', level: 2}).bullets, 5);
@@ -56,4 +56,31 @@ test('magnet gates appear in rotation and increase pickup range within safe boun
     assert.equal(applyGate({...base, pickupRange: 4.4}, {modifier: 'pickupRange', operation: 'add', level: 4}).pickupRange, 4.5);
     assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: -2}).pickupRange, 1);
     assert.equal(base.pickupRange, 1.8);
+});
+
+test('single gates spawn in one lane, remain inert until shot, and activate on their first hit', () => {
+    for (let stage = 1; stage <= 8; stage++) {
+        for (let index = 1; index < 8; index += 2) {
+            const gate = createSingleGate(stage, index);
+            assert.ok(GATE_LANES.includes(gate.x));
+            assert.equal(gate.level, 0);
+            assert.equal(gate.single, true);
+            assert.match(gateLabel(gate), /SCHIESS!/);
+            assert.equal(selectCrossedGate([gate], gate.x, 7.8, 8.2, 8), null);
+            const active = improveGate(gate);
+            assert.equal(active.level, 1);
+            assert.equal(selectCrossedGate([active], gate.x, 7.8, 8.2, 8), active);
+            assert.equal(selectCrossedGate([active], gate.x + gate.width, 7.8, 8.2, 8), null);
+        }
+    }
+});
+test('damage upgrades are exact additive and multiplicative values, including after multiple bullets', () => {
+    const base = {damage: 1, fireRate: 1, bullets: 4};
+    const added = applyGate(base, {modifier: 'damage', operation: 'add', level: 4});
+    assert.equal(added.damage, 5);
+    const doubled = applyGate(added, {modifier: 'damage', operation: 'multiply', level: 4});
+    assert.equal(doubled.damage, 10);
+    assert.equal(applyGate({...base, damage: 2}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, 4);
+    assert.equal(applyGate({...base, damage: 250}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, MAX_RUNNER_DAMAGE);
+    assert.equal(base.damage, 1);
 });
