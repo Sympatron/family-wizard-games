@@ -1,7 +1,7 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
@@ -275,7 +275,7 @@ function formation() {
     activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
     heading.textContent = 'Dino-Team aufstellen';
     renderFormationStats(all.find(item => item.id === selected), run);
-    help.textContent = 'Zwei gleiche Dinos derselben Tierstufe fusionieren. Tier III ermöglicht eine Artentwicklung.';
+    help.textContent = 'Dinos per Drag & Drop auf Felder oder in den Vorrat ziehen. Zwei gleiche Dinos zum Fusionieren aufeinanderziehen.';
     actions.replaceChildren();
     const picker = document.createElement('div');
     picker.className = 'unit-picker';
@@ -294,18 +294,6 @@ function formation() {
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     addButton(row, 'Team automatisch aufstellen', () => void execute('auto-place'), {disabled: !all.length});
     addButton(row, 'Entwicklungsbaum', showEvolutionTree);
-    if (run.army.some(unit => unit.id === selected)) {
-        addButton(row, 'Ausgewählten Dino in Vorrat', () => void execute('reserve', {id: selected}));
-    }
-    const merge = mergeOptions(all);
-    for (const option of merge) {
-        const tier = all.find(unit => unit.id === option.ids[0])?.level ?? 1;
-        const label = SPECIES[option.species].name + (tier === 3 ? ' entwickeln' : ' Tier ' + (tier + 1));
-        addButton(row, label, () => {
-            if (option.choices.length === 1) void execute('merge', {ids: option.ids, into: option.choices[0]});
-            else chooseEvolution(option.ids, option.choices);
-        });
-    }
     actions.append(row);
 }
 function beginBattle() {
@@ -364,7 +352,7 @@ async function beginRunner() {
     }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
-    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Triff Käfige und verbessere Tore durch Schüsse.';
+    help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Schieße auf Käfige und Tore; Magnet-Tore erhöhen die Münzreichweite.';
     try {
         const {startRunner} = await import('./runner/runner.js');
         if (activePhase !== 'runner' || token !== runnerStartToken) return;
@@ -382,7 +370,8 @@ async function beginRunner() {
         onProgress: progress => {
             hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
                 ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets + ' · Münzen ' + (progress.coins ?? 0);
+                ' · Kugeln ' + progress.temporary.bullets + ' · Magnet ' + progress.temporary.pickupRange.toFixed(1) +
+                ' · Münzen ' + (progress.coins ?? 0);
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
@@ -419,9 +408,8 @@ function apply(snapshot) {
             if (phase === 'runner') void beginRunner();
             else if (phase === 'formation' || phase === 'battle') {
                 activeView = new BattleView(host, {
-                    onCell: cell => { if (selected) dropDinosaur(selected, cell); },
                     onSelect: id => { selected = id; formation(); },
-                    onDrop: (id, cell) => { selected = id; dropDinosaur(id, cell); }
+                    onDrop: (id, target) => { selected = id; dropDinosaur(id, target); }
                 });
                 if (phase === 'formation') formation();
                 else beginBattle();
