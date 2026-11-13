@@ -89,69 +89,6 @@ function dropDinosaur(id, target) {
         else chooseEvolution(result.ids, result.choices);
     } else void execute(result.type, result.payload);
 }
-function enableUnitDragging(button, id) {
-    button.draggable = true;
-    button.addEventListener('dragstart', event => {
-        if (activePhase !== 'formation') return event.preventDefault();
-        event.dataTransfer.setData('text/plain', id);
-        event.dataTransfer.effectAllowed = 'move';
-        selected = id;
-    });
-    button.addEventListener('pointerdown', event => {
-        if (!['touch', 'pen'].includes(event.pointerType) || activePhase !== 'formation') return;
-        const {pointerId, clientX: startX, clientY: startY} = event;
-        let dragging = false;
-        let ghost = null;
-        function move(next) {
-            if (next.pointerId !== pointerId) return;
-            if (!dragging && Math.hypot(next.clientX - startX, next.clientY - startY) < 12) return;
-            if (!dragging) {
-                dragging = true;
-                selected = id;
-                ghost = document.createElement('div');
-                ghost.className = 'dino-drag-ghost';
-                ghost.textContent = button.textContent;
-                document.body.append(ghost);
-            }
-            next.preventDefault();
-            ghost.style.left = next.clientX + 'px';
-            ghost.style.top = next.clientY + 'px';
-            activeView?.highlightClient(next.clientX, next.clientY, id);
-        }
-        function cleanup(next, cancelled) {
-            if (next.pointerId !== pointerId) return;
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            window.removeEventListener('pointercancel', cancel);
-            ghost?.remove();
-            const target = !cancelled && dragging ? activeView?.targetAtClient(next.clientX, next.clientY, id) : null;
-            activeView?.showDropTarget(null);
-            if (target && activePhase === 'formation') dropDinosaur(id, target);
-        }
-        function up(next) { cleanup(next, false); }
-        function cancel(next) { cleanup(next, true); }
-        window.addEventListener('pointermove', move, {passive: false});
-        window.addEventListener('pointerup', up);
-        window.addEventListener('pointercancel', cancel);
-    });
-}
-host.addEventListener('dragover', event => {
-    if (activePhase !== 'formation') return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    activeView?.highlightClient(event.clientX, event.clientY);
-});
-host.addEventListener('dragleave', event => {
-    if (!host.contains(event.relatedTarget)) activeView?.showDropTarget(null);
-});
-host.addEventListener('drop', event => {
-    if (activePhase !== 'formation') return;
-    event.preventDefault();
-    const id = event.dataTransfer.getData('text/plain');
-    const target = activeView?.targetAtClient(event.clientX, event.clientY, id);
-    activeView?.showDropTarget(null);
-    if (id && target) dropDinosaur(id, target);
-});
 function paragraph(parent, text) {
     const element = document.createElement('div');
     element.textContent = text;
@@ -281,18 +218,6 @@ function formation() {
     renderFormationStats(all.find(item => item.id === selected), run);
     help.textContent = 'Dinos per Drag & Drop auf Felder oder in den Vorrat ziehen. Zwei gleiche Dinos zum Fusionieren aufeinanderziehen.';
     actions.replaceChildren();
-    const picker = document.createElement('div');
-    picker.className = 'unit-picker';
-    for (const unit of all) {
-        const species = SPECIES[unit.species];
-        const text = species.name + ' R' + species.rank + ' T' + unit.level + ' (' + unit.hp + '/' + maxHp(unit, state.game.meta.upgrades) + ')';
-        const button = addButton(picker, text, () => {
-            selected = unit.id;
-            formation();
-        }, {selected: unit.id === selected});
-        enableUnitDragging(button, unit.id);
-    }
-    actions.append(picker);
     const row = document.createElement('div');
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
