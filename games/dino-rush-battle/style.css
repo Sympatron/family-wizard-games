@@ -67,6 +67,15 @@ body {background:#0b1720;color:#eaf5ee;}
 .dino-merge-dialog p {margin:0 0 18px;color:#b4d6d9;}
 .dino-merge-options {display:flex;flex-direction:column;gap:8px;}
 .dino-merge-options button {background:#f0ca7c;color:#142734;border:0;padding:12px;border-radius:10px;font-weight:700;}
+.dino-merge-dialog:has(.dino-merge-choice) {width:min(540px,calc(100vw - 24px));overflow-y:auto;}
+.dino-merge-options .dino-merge-choice {display:grid;grid-template-columns:100px minmax(0,1fr);align-items:center;gap:10px;width:100%;padding:9px;text-align:left;background:#27424d;color:#f1f7f2;border:2px solid var(--dino-color);}
+.dino-merge-choice img {width:96px;height:76px;object-fit:contain;border-radius:8px;background:#1c333c;}
+.dino-merge-details {display:flex;flex-direction:column;gap:5px;min-width:0;}
+.dino-merge-details strong {font-size:1.05rem;color:#ffffff;}
+.dino-merge-role {font-size:.82rem;color:#c5ecdf;}
+.dino-merge-stats {font-size:.8rem;color:#f4db9f;}
+.dino-merge-options .dino-merge-choice:focus-visible {outline:3px solid #fff0ad;outline-offset:2px;}
+@media(max-width:450px) {.dino-merge-options .dino-merge-choice {grid-template-columns:70px minmax(0,1fr);gap:7px;padding:6px;}.dino-merge-choice img {width:70px;height:64px;}.dino-merge-details strong {font-size:.96rem;}.dino-merge-role,.dino-merge-stats {font-size:.73rem;}}
 
 #hud.dino-stats-panel {display:flex;justify-content:center;padding:5px 8px;text-shadow:none;}
 .dino-stat-card {--dino-color:#8bc9a8;display:grid;grid-template-columns:minmax(160px,1.3fr) minmax(140px,1fr) minmax(240px,1.8fr);align-items:center;gap:12px;width:min(100%,860px);padding:9px 12px;background:#152e3a;border:1px solid #467483;border-left:5px solid var(--dino-color);border-radius:13px;box-shadow:0 3px 14px #0006;text-align:left;}
