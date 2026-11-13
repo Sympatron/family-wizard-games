@@ -271,6 +271,7 @@ export class BattleView {
                 entry.container.y += (entry.targetY - entry.container.y) * blend;
             }
         }
+        for (const entry of this.units.values()) entry.mastery?.setPosition(entry.container.x, entry.container.y - 43);
     }
 
     formationUnits() {
@@ -335,14 +336,14 @@ export class BattleView {
         const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(appearance.width, appearance.height);
         const selection = scene.add.ellipse(0, -8, appearance.width + 15, appearance.height + 15, 0xffef8a, 0)
             .setStrokeStyle(0, 0xffef8a);
-        const mastery = scene.add.text(0, -43, 'R' + SPECIES[unit.species].rank + ' · T' + tier, {
+        const mastery = scene.add.text(unit.x, unit.y - 43, 'R' + SPECIES[unit.species].rank + ' · T' + tier, {
             fontFamily: 'system-ui', fontSize: '13px', fontStyle: 'bold', color: appearance.label,
             stroke: '#10202b', strokeThickness: 3
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(12);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, aura, selection, sprite, mastery, healthBack, health]);
-        const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
+        container.add([shadow, aura, selection, sprite, healthBack, health]);
+        const result = {container, sprite, selection, mastery, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
     }
@@ -379,8 +380,11 @@ export class BattleView {
             entry.targetX = unit.x;
             entry.targetY = unit.y;
             if (isFormation && this.drag?.id !== unit.id) entry.container.setPosition(unit.x, unit.y);
+            entry.mastery.setPosition(entry.container.x, entry.container.y - 43);
+            entry.mastery.setVisible(unit.hp > 0 || isFormation);
             entry.container.setVisible(unit.hp > 0 || isFormation);
             entry.container.setAlpha(unit.hp > 0 ? 1 : 0.4);
+            entry.mastery.setAlpha(unit.hp > 0 ? 1 : 0.4);
             entry.sprite.setTint(unit.stunned ? 0xf0d37d : 0xffffff);
             const chosen = unit.id === this.selected && isFormation;
             entry.selection.setStrokeStyle(chosen ? 4 : 0, 0xffef8a);
@@ -389,6 +393,7 @@ export class BattleView {
         for (const [key, entry] of this.units) {
             if (!visible.has(key)) {
                 entry.container.destroy();
+                entry.mastery.destroy();
                 this.units.delete(key);
             }
         }
