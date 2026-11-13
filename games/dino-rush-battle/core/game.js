@@ -36,10 +36,10 @@ export function getEnemies(stage) {
     const advanced = ['allosaurus', 'troodon', 'ankylosaurus', 'stegosaurus', 'quetzalcoatlus', 'tapejara'];
     const elite = ['carnotaurus', 'dilophosaurus', 'euoplocephalus', 'kentrosaurus', 'hatzegopteryx', 'caiuajara'];
     return Array.from({length: Math.min(stage === 1 ? 4 : 3 + Math.floor((stage + 1) / 2), 10)}, (_, i) => {
-        const species = stage >= 26 && i % 7 === 0 ? elite[(stage + i) % elite.length]
+        const species = stage >= 35 && i % 7 === 0 ? elite[(stage + i) % elite.length]
             : stage >= 14 && i % 5 === 0 ? advanced[(stage + i) % advanced.length]
             : starters[(i + stage) % starters.length];
-        const level = stage >= 17 && i % 4 === 0 ? 3 : stage >= 8 && i % 4 === 0 ? 2 : 1;
+        const level = stage >= 45 && i % 4 === 0 ? 2 : stage >= 8 && i % 4 === 0 && SPECIES[species].rank === 1 ? 2 : 1;
         const unit = {id: 'e' + i, species, level, cell: i};
         return {...unit, hp: Math.round(maxHp(unit) * (0.78 + stage * 0.022))};
     });
@@ -84,7 +84,8 @@ export function reduceGame(game, action) {
             if (!Array.isArray(collected) || collected.length > 30 || collected.some(item => {
                 const species = typeof item === 'string' ? item : item?.species;
                 const level = typeof item === 'string' ? 1 : item?.level;
-                return !SPECIES[species] || !Number.isInteger(level) || level < 1 || level > MAX_TIER || SPECIES[species].rank > 2;
+                return !SPECIES[species] || !Number.isInteger(level) || level < 1 || level > MAX_TIER ||
+                    SPECIES[species].rank > (run.stage >= 25 ? 3 : 2);
             })) fail('Ungültige Dinosaurier.');
             for (const item of collected) {
                 const species = typeof item === 'string' ? item : item.species;

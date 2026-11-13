@@ -370,6 +370,7 @@ async function beginRunner() {
         if (activePhase !== 'runner' || token !== runnerStartToken) return;
         activeView = startRunner(host, {
         stage: game.run.stage, upgrades: game.meta.upgrades,
+        roster: [...game.run.army, ...game.run.inventory].map(unit => unit.species),
         onPauseChange: paused => {
             if (pauseToggle) {
                 pauseToggle.textContent = paused ? 'Weiter' : 'Pause';

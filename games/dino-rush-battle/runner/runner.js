@@ -21,7 +21,7 @@ import {volleyPattern} from './shots.js';
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, onPauseChange = () => {}}) {
+export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -298,7 +298,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
         return group;
     }
     function spawnWave(goalZ) {
-        for (const item of createRunnerWave(spawnCount++, stage)) {
+        for (const item of createRunnerWave(spawnCount++, stage, Math.random, roster)) {
             if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
             const group = cage(item.species, item.rarity);
             group.position.set(item.x, 0, item.z);
@@ -486,7 +486,7 @@ export function startRunner(host, {stage, upgrades = {}, onProgress, onFinish, o
             shoot();
             shotTimer += 0.28 / temporary.fireRate;
         }
-        const speed = 17 + stage * 0.6;
+        const speed = 17 + Math.min(stage, 12) * 0.6;
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         if (remaining > 0 && elapsed >= nextSpawn) {
             spawnWave(finishGoal.position.z);
