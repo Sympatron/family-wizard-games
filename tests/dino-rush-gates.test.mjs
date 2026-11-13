@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
+import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, GATE_WIDTH, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
 import {volleyPattern, SHOT_INTERVAL_SECONDS} from '../games/dino-rush-battle/runner/shots.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
@@ -64,6 +64,8 @@ test('single gates spawn in one lane, remain inert until shot, and activate on t
         for (let index = 1; index < 8; index += 2) {
             const gate = createSingleGate(stage, index);
             assert.ok(GATE_LANES.includes(gate.x));
+            assert.equal(gate.x, GATE_LANES[(stage + Math.floor(index / 2)) % GATE_LANES.length]);
+            assert.equal(gate.width, GATE_WIDTH);
             assert.equal(gate.level, 0);
             assert.equal(gate.single, true);
             assert.match(gateLabel(gate), /SCHIESS!/);
@@ -123,4 +125,21 @@ test('fractional upgrades compound on the current value without rounding or hidd
     assert.ok(Math.abs(addedRate.fireRate / SHOT_INTERVAL_SECONDS - 8.4) < 1e-10);
     assert.equal(gateLabel(add('fireRate')), 'TEMPO +4');
     assert.deepEqual(starting, {damage: 2.2, fireRate: 2.2 * SHOT_INTERVAL_SECONDS, bullets: 3, pickupRange: 2.2});
+});
+
+test('single gates occupy exactly one of the same two full-width halves as double gates', () => {
+    assert.deepEqual(GATE_LANES, [-3.2, 3.2]);
+    assert.equal(GATE_WIDTH, 6.1);
+    for (let stage = 1; stage <= 8; stage++) {
+        const positions = new Set();
+        for (let index = 1; index <= 9; index += 2) {
+            const gate = createSingleGate(stage, index);
+            positions.add(gate.x);
+            assert.equal(gate.width, GATE_WIDTH);
+            const innerEdge = Math.abs(gate.x) - gate.width / 2;
+            assert.ok(innerEdge > 0, 'single gate leaves the middle divider clear');
+            assert.equal(selectCrossedGate([improveGate(gate)], 0, 7, 9, 8), null);
+        }
+        assert.deepEqual(positions, new Set(GATE_LANES));
+    }
 });
