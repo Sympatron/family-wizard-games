@@ -410,6 +410,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         coinFlights.push({group: obj.group, value: obj.value, origin: obj.group.position.clone(), elapsed: 0, phase: 'attract'});
     }
     function projectCoinToHost(position) {
+        camera.updateMatrixWorld();
         const projected = position.clone().project(camera);
         const canvasRect = renderer.domElement.getBoundingClientRect();
         const hostRect = host.getBoundingClientRect();
@@ -438,6 +439,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                     flight.element = document.createElement('span');
                     flight.element.className = 'dino-coin-flight';
                     flight.element.textContent = String(flight.value);
+                    flight.element.style.left = origin.x + 'px';
+                    flight.element.style.top = origin.y + 'px';
+                    flight.element.style.transform = 'translate(-50%, -50%)';
                     host.append(flight.element);
                 }
                 continue;
