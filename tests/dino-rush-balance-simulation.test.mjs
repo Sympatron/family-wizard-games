@@ -4,7 +4,7 @@ import {SPECIES} from '../games/dino-rush-battle/core/game.js';
 import {createRunnerWave, cageHitPoints, RUNNER_SPECIES, ADVANCED_SPECIES, ELITE_SPECIES} from '../games/dino-rush-battle/runner/spawns.js';
 import {volleyPattern} from '../games/dino-rush-battle/runner/shots.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
-import {toBattleScreen} from '../games/dino-rush-battle/core/board-layout.js';
+import {toCombatScreen} from '../games/dino-rush-battle/core/board-layout.js';
 
 function randomGenerator(seed) {
     return () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000);
@@ -55,9 +55,9 @@ test('initial battle armies are visibly separated in both orientations', () => {
     const enemy = frame.find(unit => unit.team === 'enemy');
     assert.ok(enemy.x - player.x >= 450);
     for (const portrait of [true, false]) {
-        const p = toBattleScreen(player.x, player.y, portrait);
-        const e = toBattleScreen(enemy.x, enemy.y, portrait);
-        assert.ok(p.y - e.y > 370, 'armies need a substantial visible distance');
-        assert.ok(p.y < 620 && e.y > 0);
+        const p = toCombatScreen(player.x, player.y, portrait);
+        const e = toCombatScreen(enemy.x, enemy.y, portrait);
+        assert.ok(p.y - e.y >= 480, 'armies need a substantially larger visible gap');
+        assert.ok(p.y < 580 && e.y > 45, 'both teams must remain fully visible at the start');
     }
 });
