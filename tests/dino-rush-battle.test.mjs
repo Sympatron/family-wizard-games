@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, reduceGame} from '../games/dino-rush-battle/core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, getMergeChoices, reduceGame, migrateGame, maxHp} from '../games/dino-rush-battle/core/game.js';
+import {healingCost, gunUpgradeCost} from '../games/dino-rush-battle/core/shop.js';
+import {initialRunnerWeaponStats} from '../games/dino-rush-battle/runner/shots.js';
 import {simulateBattle} from '../games/dino-rush-battle/core/battle.js';
 import {BOARD_SIZE, battleCellAt, battleCellCenter, toBattleScreen, clientPointToCell} from '../games/dino-rush-battle/core/board-layout.js';
 
@@ -27,13 +29,17 @@ test('runner collection, formation, branch evolution and battle reward form a st
     assert.equal(game.run.phase, 'rewards');
     assert.equal(game.run.money, 35);
     assert.ok(game.run.army.every(unit => unit.hp >= 25));
-    game = apply(game, 'buy-potion');
-    assert.equal(game.run.money, 15);
-    assert.equal(game.run.potions, 1);
+    const injured = game.run.army.find(unit => unit.hp < maxHp(unit, game.meta.upgrades));
+    const cost = healingCost(injured.hp, maxHp(injured, game.meta.upgrades));
+    game = apply(game, 'heal', {id: injured.id});
+    assert.equal(game.run.money, 35 - cost);
+    assert.equal(game.run.army.find(unit => unit.id === injured.id).hp, maxHp(injured, game.meta.upgrades));
+    assert.throws(() => apply(game, 'buy-potion'), /Unbekannte Spielaktion/);
     assert.throws(() => apply(game, 'buy-battle-damage'), /Nicht genug Geld/);
     game = apply(game, 'next-stage');
     assert.equal(game.run.stage, 2);
     assert.equal(game.run.battleUpgrades.damage, 0);
+    assert.deepEqual(game.run.gunUpgrades, {damage: 0, fireRate: 0, bullets: 0});
     assert.equal(game.run.phase, 'runner');
 });
 test('loss resets temporary progress and awards persistent meta currency', () => {
