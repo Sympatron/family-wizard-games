@@ -9,7 +9,7 @@ const CELL_SPACING_X = 66;
 const CELL_SPACING_Y = 58;
 export const RESERVE_LAYOUT = Object.freeze({portrait: {left: 416, width: 124, center: 478}, landscape: {left: 768, width: 192, center: 864}});
 export function reserveSidebar(portrait) { return RESERVE_LAYOUT[portrait ? 'portrait' : 'landscape']; }
-export function reserveUnitPosition(index, portrait) { return {x: reserveSidebar(portrait).center, y: 86 + index * 55}; }
+export function reserveUnitPosition(index, portrait) { return {x: reserveSidebar(portrait).center, y: 95 + index * 84}; }
 
 export function toBattleScreen(x, y, portrait) {
     return portrait
