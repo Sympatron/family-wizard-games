@@ -21,7 +21,7 @@ export function createRunnerWave(wave, stage, random = Math.random) {
         const types = rarity === 'rare' ? ADVANCED_SPECIES : RUNNER_SPECIES;
         const species = types[Math.min(types.length - 1, Math.floor(random() * types.length))];
         return {
-            kind: 'cage', rarity, species, level: rarity === 'reinforced' ? 2 : 1,
+            kind: 'cage', rarity, species, level: rarity === 'reinforced' ? 2 : rarity === 'rare' && stage >= 18 ? 3 : rarity === 'rare' && stage >= 10 ? 2 : 1,
             hp: cageHitPoints(stage, rarity),
             x: -4.9 + random() * 9.8,
             z: -58 - index * 6 - random() * 8
