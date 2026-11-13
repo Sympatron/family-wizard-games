@@ -24,7 +24,10 @@ test('Phaser preloads matching dinosaur SVG textures', () => {
     const loaded = [];
     const view = Object.create(BattleView.prototype);
     view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config})}});
-    assert.equal(loaded.length, Object.keys(SPECIES).length);
+    assert.equal(loaded.length, Object.keys(SPECIES).length + 1);
+    assert.deepEqual(loaded.find(item => item.key === 'dino-battlefield'), {
+        key: 'dino-battlefield', url: './assets/battlefield.svg', config: {width: 960, height: 620}
+    });
     for (const species of Object.keys(SPECIES)) {
         assert.deepEqual(loaded.find(item => item.key === 'dino-' + species), {
             key: 'dino-' + species, url: './assets/dinos/' + species + '.svg', config: {width: 160, height: 128}
