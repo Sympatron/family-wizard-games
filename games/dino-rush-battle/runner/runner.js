@@ -400,6 +400,65 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         objects.splice(i, 1);
         disposeGroup(obj.group);
     }
+    function startCoinFlight(obj) {
+        const index = objects.indexOf(obj);
+        if (index < 0) return;
+        objects.splice(index, 1);
+        runnerCoins += obj.value;
+        hitSound.hit('coin');
+        notices.show('+' + obj.value + ' Münzen');
+        coinFlights.push({group: obj.group, value: obj.value, origin: obj.group.position.clone(), elapsed: 0, phase: 'attract'});
+    }
+    function projectCoinToHost(position) {
+        const projected = position.clone().project(camera);
+        const canvasRect = renderer.domElement.getBoundingClientRect();
+        const hostRect = host.getBoundingClientRect();
+        return {
+            x: canvasRect.left + (projected.x + 1) * canvasRect.width / 2 - hostRect.left,
+            y: canvasRect.top + (1 - projected.y) * canvasRect.height / 2 - hostRect.top
+        };
+    }
+    function animateCoinFlights(dt) {
+        for (let i = coinFlights.length - 1; i >= 0; i--) {
+            const flight = coinFlights[i];
+            flight.elapsed += dt;
+            if (flight.phase === 'attract') {
+                const destination = {x: player.position.x, y: 1.8, z: player.position.z};
+                const point = interpolateCoinFlight(flight.origin, destination, flight.elapsed, COIN_ATTRACT_SECONDS);
+                flight.group.position.set(point.x, point.y, point.z);
+                flight.group.rotation.y += dt * 10;
+                flight.group.scale.setScalar(1 - Math.min(1, flight.elapsed / COIN_ATTRACT_SECONDS) * 0.55);
+                if (flight.elapsed >= COIN_ATTRACT_SECONDS) {
+                    const origin = projectCoinToHost(flight.group.position);
+                    disposeGroup(flight.group);
+                    flight.group = null;
+                    flight.phase = 'counter';
+                    flight.elapsed = 0;
+                    flight.origin = origin;
+                    flight.element = document.createElement('span');
+                    flight.element.className = 'dino-coin-flight';
+                    flight.element.textContent = String(flight.value);
+                    host.append(flight.element);
+                }
+                continue;
+            }
+            const rect = document.querySelector('#runner-coin-counter')?.getBoundingClientRect();
+            const hostRect = host.getBoundingClientRect();
+            const destination = rect
+                ? {x: rect.left + rect.width / 2 - hostRect.left, y: rect.top + rect.height / 2 - hostRect.top}
+                : {x: host.clientWidth / 2, y: 25};
+            const point = interpolateCoinFlight(flight.origin, destination, flight.elapsed, COIN_COUNTER_SECONDS);
+            const progress = Math.min(1, flight.elapsed / COIN_COUNTER_SECONDS);
+            flight.element.style.left = point.x + 'px';
+            flight.element.style.top = point.y + 'px';
+            flight.element.style.transform = 'translate(-50%, -50%) scale(' + (1 - 0.55 * progress) + ')';
+            if (progress >= 1) {
+                flight.element.remove();
+                displayCoins += flight.value;
+                coinFlights.splice(i, 1);
+            }
+        }
+    }
     function shoot() {
         const volley = volleyPattern(Math.min(5, temporary.bullets), temporary.damage);
         for (const shot of volley) {
@@ -550,11 +609,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             if (obj.kind === 'coin') {
                 obj.group.rotation.y += dt * 2.5;
                 if (crossedCoin(player.position.x, player.position.z, previousZ, obj.z, obj.x, temporary.pickupRange)) {
-                    runnerCoins += obj.value;
-                    hitSound.hit('coin');
-                    notices.show('+' + obj.value + ' Münzen');
-                    burst(obj.x, 1.7, obj.z, 'upgrade');
-                    removeObject(obj);
+                    startCoinFlight(obj);
                 } else if (obj.z > player.position.z + 2) removeObject(obj);
                 continue;
             }
@@ -613,10 +668,11 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 damageLabels.splice(i, 1);
             }
         }
+        animateCoinFlights(dt);
         reportTimer -= dt;
         if (reportTimer <= 0) {
             updateGateGuide();
-            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: runnerCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
+            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: displayCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
@@ -699,6 +755,12 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         window.removeEventListener('keyup', keyUp);
         document.removeEventListener('visibilitychange', visibilityChange);
         for (const obj of [...objects]) removeObject(obj);
+        for (const flight of coinFlights) {
+            flight.element?.remove();
+            if (flight.group) disposeGroup(flight.group);
+        }
+        coinFlights.length = 0;
+        gateGuide.remove();
         for (const bullet of bullets) {
             scene.remove(bullet.mesh);
             bullet.mesh.geometry.dispose();
