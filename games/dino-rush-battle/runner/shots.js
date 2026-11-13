@@ -1,3 +1,4 @@
+import {BASE_PICKUP_RANGE} from './coins.js';
 export const MAX_BULLETS = 5;
 export function volleyPattern(count, totalDamage) {
     if (!Number.isInteger(count) || count < 1 || count > MAX_BULLETS || !(totalDamage > 0) || !Number.isFinite(totalDamage)) {
@@ -15,5 +16,5 @@ export function volleyPattern(count, totalDamage) {
 
 export function initialRunnerWeaponStats(upgrades = {}) {
     const permanent = Number(upgrades.runnerDamage) || 0;
-    return {damage: Math.max(0.3, Math.min(3, 1 + Math.max(0, permanent) * 0.12)), fireRate: 1, bullets: 1};
+    return {damage: Math.max(0.3, Math.min(3, 1 + Math.max(0, permanent) * 0.12)), fireRate: 1, bullets: 1, pickupRange: BASE_PICKUP_RANGE};
 }
