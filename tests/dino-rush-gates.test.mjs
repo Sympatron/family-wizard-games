@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, MAX_RUNNER_DAMAGE, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
-import {volleyPattern} from '../games/dino-rush-battle/runner/shots.js';
+import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
+import {volleyPattern, SHOT_INTERVAL_SECONDS} from '../games/dino-rush-battle/runner/shots.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
     for (let stage = 1; stage <= 8; stage++) {
@@ -47,14 +47,14 @@ test('passing either side or the center of a gate pair reliably selects exactly 
     assert.equal(selectCrossedGate(gates, 0, 9, 10, 8), null);
 });
 
-test('magnet gates appear in rotation and increase pickup range within safe bounds', () => {
+test('magnet gates apply absolute pickup range upgrades to the current value', () => {
     const base = {damage: 1, fireRate: 1, bullets: 1, pickupRange: 1.8};
     assert.ok(GATE_PROPERTIES.includes('pickupRange'));
     assert.ok(Array.from({length: 8}, (_, index) => createGatePair(1, index)).flat().some(gate => gate.modifier === 'pickupRange'));
     assert.equal(gateLabel({modifier: 'pickupRange', operation: 'add', level: 2}), 'MAGNET +2');
-    assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: 2}).pickupRange, 2.6);
+    assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: 2}).pickupRange, 3.8);
     assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'multiply', level: 4}).pickupRange, 3.6);
-    assert.equal(applyGate({...base, pickupRange: 4.4}, {modifier: 'pickupRange', operation: 'add', level: 4}).pickupRange, 4.5);
+    assert.equal(applyGate({...base, pickupRange: 4.4}, {modifier: 'pickupRange', operation: 'add', level: 4}).pickupRange, 8.4);
     assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: -2}).pickupRange, 1);
     assert.equal(base.pickupRange, 1.8);
 });
@@ -82,7 +82,7 @@ test('damage upgrades are exact additive and multiplicative values, including af
     const doubled = applyGate(added, {modifier: 'damage', operation: 'multiply', level: 4});
     assert.equal(doubled.damage, 10);
     assert.equal(applyGate({...base, damage: 2}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, 4);
-    assert.equal(applyGate({...base, damage: 250}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, MAX_RUNNER_DAMAGE);
+    assert.equal(applyGate({...base, damage: 250}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, 500);
     assert.equal(base.damage, 1);
 });
 
@@ -103,4 +103,24 @@ test('gate labels match actual damage delivered by every individual bullet', () 
     for (const bullet of bullets) cageHp -= bullet.damage;
     assert.equal(cageHp, 0);
     assert.equal(stats.bullets, 3);
+});
+
+test('fractional upgrades compound on the current value without rounding or hidden caps', () => {
+    const multiply = modifier => ({modifier, operation: 'multiply', level: 4});
+    const add = modifier => ({modifier, operation: 'add', level: 4});
+    const starting = {damage: 2.2, fireRate: 2.2 * SHOT_INTERVAL_SECONDS, bullets: 3, pickupRange: 2.2};
+    const doubledDamage = applyGate(starting, multiply('damage'));
+    assert.equal(doubledDamage.damage, 4.4);
+    const addedDamage = applyGate(doubledDamage, add('damage'));
+    assert.equal(addedDamage.damage, 8.4);
+    assert.deepEqual(volleyPattern(addedDamage.bullets, addedDamage.damage).map(shot => shot.damage), [8.4, 8.4, 8.4]);
+    const doubledRange = applyGate(starting, multiply('pickupRange'));
+    assert.equal(doubledRange.pickupRange, 4.4);
+    assert.equal(applyGate(doubledRange, add('pickupRange')).pickupRange, 8.4);
+    const doubledRate = applyGate(starting, multiply('fireRate'));
+    assert.ok(Math.abs(doubledRate.fireRate / SHOT_INTERVAL_SECONDS - 4.4) < 1e-10);
+    const addedRate = applyGate(doubledRate, add('fireRate'));
+    assert.ok(Math.abs(addedRate.fireRate / SHOT_INTERVAL_SECONDS - 8.4) < 1e-10);
+    assert.equal(gateLabel(add('fireRate')), 'TEMPO +4');
+    assert.deepEqual(starting, {damage: 2.2, fireRate: 2.2 * SHOT_INTERVAL_SECONDS, bullets: 3, pickupRange: 2.2});
 });
