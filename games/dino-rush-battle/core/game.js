@@ -6,8 +6,12 @@ export function migrateGame(game) {
     result.version = 2;
     for (const unit of [...(result.run?.army ?? []), ...(result.run?.inventory ?? [])]) {
         const rank = SPECIES[unit.species]?.rank ?? 1;
-        unit.level = Math.max(1, Math.min(MAX_TIER, (unit.level ?? 1) - (rank > 1 ? 1 : 0)));
-        unit.hp = Math.min(unit.hp, maxHp(unit, result.meta?.upgrades));
+        const oldLevel = unit.level ?? 1;
+        const oldMaximum = SPECIES[unit.species].hp * (1 + (oldLevel - 1) * 0.2) *
+            (1 + (result.meta?.upgrades?.starterHp ?? 0) * 0.08);
+        unit.level = Math.max(1, Math.min(MAX_TIER, oldLevel - (rank > 1 ? 1 : 0)));
+        unit.hp = Math.max(0, Math.min(maxHp(unit, result.meta?.upgrades),
+            Math.round(unit.hp / Math.max(1, oldMaximum) * maxHp(unit, result.meta?.upgrades))));
     }
     return result;
 }
