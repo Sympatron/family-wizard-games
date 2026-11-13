@@ -105,7 +105,7 @@ export class BattleView {
     toScreen(x, y) { return toCombatScreen(x, y, this.portrait); }
     cellCenter(team, cell) { return battleCellCenter(team, cell, this.portrait); }
     cellAt(x, y) { return battleCellAt(x, y, this.portrait); }
-    get reservePageSize() { return 9; }
+    get reservePageSize() { return 6; }
     get width() { return this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width; }
 
     pointAtClient(clientX, clientY) {
