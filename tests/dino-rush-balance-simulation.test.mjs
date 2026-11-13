@@ -37,12 +37,12 @@ test('late rare cages advance progression without rescuing an apex directly', ()
     assert.equal(endgame.level, 3);
     assert.ok(cageHitPoints(46, 'rare') <= 65);
 });
-test('weapon upgrades improve DPS but cannot multiply per-volley damage by bullet count', () => {
+test('each bullet deals the full upgraded damage instead of dividing it among the volley', () => {
     for (const count of [1, 2, 3, 4, 5]) {
-        for (const total of [1, 2, 3]) {
-            const volley = volleyPattern(count, total);
-            assert.ok(Math.abs(volley.reduce((sum, shot) => sum + shot.damage, 0) - total) < 1e-10);
-            assert.ok(volley.every(shot => shot.damage <= total));
+        for (const perBullet of [1, 2.2, 4.4]) {
+            const volley = volleyPattern(count, perBullet);
+            assert.ok(Math.abs(volley.reduce((sum, shot) => sum + shot.damage, 0) - perBullet * count) < 1e-10);
+            assert.ok(volley.every(shot => shot.damage === perBullet));
         }
     }
     assert.ok(cageHitPoints(15, 'common') > cageHitPoints(1, 'common'));
