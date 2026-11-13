@@ -53,8 +53,8 @@ export function createRunnerHud(doc) {
         ['time', 'Zeit', progress => progress.seconds + 's'],
         ['hp', 'Leben', progress => String(progress.hp)],
         ['dinos', 'Dinos', progress => String(progress.collected)],
-        ['damage', 'Schaden', progress => '×' + progress.temporary.damage.toFixed(1)],
-        ['fireRate', 'Tempo', progress => '×' + progress.temporary.fireRate.toFixed(1)],
+        ['damage', 'Schaden pro Schussserie', progress => progress.temporary.damage.toFixed(1)],
+        ['fireRate', 'Schussserien pro Sekunde', progress => (progress.temporary.fireRate / 0.28).toFixed(1) + '/s'],
         ['bullets', 'Kugeln', progress => String(progress.temporary.bullets)],
         ['pickupRange', 'Magnet', progress => progress.temporary.pickupRange.toFixed(1)],
         ['coins', 'Münzen', progress => String(progress.coins ?? 0)]
