@@ -1,4 +1,5 @@
-export const GATE_PROPERTIES = ['damage', 'fireRate', 'bullets'];
+import {BASE_PICKUP_RANGE, MAX_PICKUP_RANGE} from './coins.js';
+export const GATE_PROPERTIES = ['damage', 'fireRate', 'bullets', 'pickupRange'];
 const bound = (value, low, high) => Math.max(low, Math.min(high, value));
 export function createGatePair(stage, pairIndex) {
     const first = (stage + pairIndex) % GATE_PROPERTIES.length;
@@ -12,7 +13,7 @@ export function gateValue(gate) {
     return gate.operation === 'multiply' ? 1 + gate.level * 0.25 : gate.level;
 }
 export function gateLabel(gate) {
-    const property = {damage: 'SCHADEN', fireRate: 'TEMPO', bullets: 'KUGELN'}[gate.modifier];
+    const property = {damage: 'SCHADEN', fireRate: 'TEMPO', bullets: 'KUGELN', pickupRange: 'MAGNET'}[gate.modifier];
     if (!property || !['add', 'multiply'].includes(gate.operation)) throw new Error('Ungültiges Tor');
     const value = gateValue(gate);
     return property + ' ' + (gate.operation === 'multiply' ? '×' + value.toFixed(2).replace(/0$/, '').replace(/\.$/, '') : (value >= 0 ? '+' : '') + value);
@@ -23,12 +24,14 @@ export function improveGate(gate) {
 export function applyGate(temporary, gate) {
     if (!GATE_PROPERTIES.includes(gate.modifier) || !['add', 'multiply'].includes(gate.operation)) throw new Error('Ungültiges Tor');
     const next = {...temporary};
-    const current = next[gate.modifier];
+    const current = next[gate.modifier] ?? (gate.modifier === 'pickupRange' ? BASE_PICKUP_RANGE : undefined);
     if (!Number.isFinite(current)) throw new Error('Ungültiger Bonus');
     if (gate.operation === 'multiply') next[gate.modifier] = current * gateValue(gate);
-    else next[gate.modifier] = current + gate.level * (gate.modifier === 'bullets' ? 1 : gate.modifier === 'damage' ? 0.3 : 0.12);
+    else next[gate.modifier] = current + gate.level * (gate.modifier === 'bullets' ? 1 : gate.modifier === 'damage' ? 0.3 : gate.modifier === 'pickupRange' ? 0.4 : 0.12);
     if (gate.modifier === 'bullets') next.bullets = bound(Math.round(next.bullets), 1, 5);
-    else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100, 0.3, gate.modifier === 'fireRate' ? 2.5 : 3);
+    else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100,
+        gate.modifier === 'pickupRange' ? 1 : 0.3,
+        gate.modifier === 'pickupRange' ? MAX_PICKUP_RANGE : gate.modifier === 'fireRate' ? 2.5 : 3);
     return next;
 }
 
