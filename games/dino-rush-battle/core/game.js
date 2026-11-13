@@ -1,4 +1,5 @@
 import {SPECIES, MAX_TIER} from './species.js';
+import {BASE_PICKUP_RANGE, MAX_PICKUP_RANGE} from '../runner/coins.js';
 export {SPECIES} from './species.js';
 export function migrateGame(game) {
     if (!game || game.version >= 2) return game;
@@ -32,7 +33,7 @@ export function createRun() {
     return {
         phase: 'runner', stage: 1, money: 0, potions: 0, nextId: 2,
         army: [{id: 'd1', species: 'raptor', level: 1, hp: 70, cell: 0}],
-        inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1}, battleUpgrades: {damage: 0}, lastResult: null
+        inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1, pickupRange: BASE_PICKUP_RANGE}, battleUpgrades: {damage: 0}, lastResult: null
     };
 }
 export function getEnemies(stage) {
@@ -107,7 +108,8 @@ export function reduceGame(game, action) {
             run.temporary = {
                 damage: Math.max(0.25, Math.min(3, Number(temporary.damage) || 1)),
                 fireRate: Math.max(0.25, Math.min(2.5, Number(temporary.fireRate) || 1)),
-                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1)))
+                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1))),
+                pickupRange: Math.max(1, Math.min(MAX_PICKUP_RANGE, Number(temporary.pickupRange) || BASE_PICKUP_RANGE))
             };
             const coins = action.payload?.coins ?? 0;
             if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');
@@ -229,7 +231,7 @@ export function reduceGame(game, action) {
             if (run.phase !== 'rewards') fail('Schließe zuerst den Kampf ab.');
             run.stage++;
             run.phase = 'runner';
-            run.temporary = {damage: 1, fireRate: 1, bullets: 1};
+            run.temporary = {damage: 1, fireRate: 1, bullets: 1, pickupRange: BASE_PICKUP_RANGE};
             return {game: next};
         case 'upgrade': {
             if (run.phase !== 'gameover') fail('Dauerhafte Upgrades sind zwischen den Läufen verfügbar.');
