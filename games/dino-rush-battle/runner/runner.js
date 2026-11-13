@@ -598,7 +598,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.25, 2.5, dt);
         camera.lookAt(camera.position.x * 0.4, 1.5, -20);
         shotTimer -= dt;
-        if (shotTimer <= 0) {
+        while (shotTimer <= 0) {
             shoot();
             shotTimer += SHOT_INTERVAL_SECONDS / temporary.fireRate;
         }
