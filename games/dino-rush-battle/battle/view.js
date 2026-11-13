@@ -1,4 +1,4 @@
-import {SPECIES, maxHp} from '../core/game.js';
+import {SPECIES, maxHp, getMergeChoices} from '../core/game.js';
 import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt, reserveSidebar, reserveUnitPosition} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {drawBattlefield} from './terrain.js';
@@ -182,6 +182,19 @@ export class BattleView {
         this.showDropTarget(this.targetAtClient(clientX, clientY, excludeId));
     }
 
+    updateDragCompatibility() {
+        const pool = [...this.army, ...this.inventory];
+        const source = this.mode === 'formation' && this.drag?.moved ? pool.find(unit => unit.id === this.drag.id) : null;
+        for (const [key, entry] of this.units) {
+            const [team, id] = key.split(':');
+            const unit = (team === 'enemy' ? this.enemies : pool).find(candidate => candidate.id === id);
+            const incompatible = source && (team === 'enemy' || (id !== source.id && getMergeChoices(source, unit).length === 0));
+            entry.container.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
+            entry.sprite?.setTint(incompatible ? 0x777777 : 0xffffff);
+            entry.mastery?.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
+        }
+    }
+
     handlePointerDown(event) {
         this.hitSound?.unlock();
         if (this.mode !== 'formation' || (event.pointerType === 'mouse' && event.button !== 0)) return;
@@ -209,6 +222,7 @@ export class BattleView {
         }
         if (!drag.moved && Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < 9) return;
         drag.moved = true;
+        if (drag.id) this.updateDragCompatibility();
         if (drag.id) {
             const unit = this.units.get('player:' + drag.id) ?? this.units.get('reserve:' + drag.id);
             if (unit) {
@@ -224,6 +238,7 @@ export class BattleView {
         const drag = this.drag;
         if (!drag || drag.pointerId !== event.pointerId) return;
         this.drag = null;
+        this.updateDragCompatibility();
         if (this.canvas.hasPointerCapture?.(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
         const unit = this.units.get('player:' + drag.id) ?? this.units.get('reserve:' + drag.id);
         if (unit) unit.container.setPosition(unit.targetX, unit.targetY).setDepth(1);
@@ -248,6 +263,7 @@ export class BattleView {
         this.upgrades = upgrades;
         this.mode = 'formation';
         this.playback = null;
+        this.drag = null;
         this.showDropTarget(null);
         this.render();
     }
@@ -257,6 +273,7 @@ export class BattleView {
         this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
         this.lastShotFrame = -1;
         this.mode = 'battle';
+        this.drag = null;
         this.playback = {frames, index: 0, elapsed: 0, complete};
         this.render();
     }
@@ -355,7 +372,7 @@ export class BattleView {
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
         container.add([shadow, aura, selection, sprite, healthBack, health]);
-        const result = {container, sprite, selection, mastery, health, targetX: unit.x, targetY: unit.y, team: unit.team};
+        const result = {container, sprite, aura, selection, mastery, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
     }
@@ -399,9 +416,12 @@ export class BattleView {
             entry.mastery.setAlpha(unit.hp > 0 ? 1 : 0.4);
             entry.sprite.setTint(unit.stunned ? 0xf0d37d : 0xffffff);
             const chosen = unit.id === this.selected && isFormation;
+            entry.aura.setVisible(isFormation);
+            entry.selection.setVisible(isFormation);
             entry.selection.setStrokeStyle(chosen ? 4 : 0, 0xffef8a);
             entry.health.displayWidth = 48 * Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
         }
+        this.updateDragCompatibility();
         for (const [key, entry] of this.units) {
             if (!visible.has(key)) {
                 entry.container.destroy();
