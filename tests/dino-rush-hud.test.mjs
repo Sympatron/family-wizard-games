@@ -30,7 +30,7 @@ test('runner HUD shows eight labeled icons with numerical values rather than tex
         assert.ok(value.textContent.length > 0);
         assert.ok(item.attributes['aria-label'].includes(value.textContent));
     }
-    assert.deepEqual(hud.root.children.map(item => item.children[1].textContent), ['29s', '3', '4', '×1.6', '×1.2', '3', '2.6', '35']);
+    assert.deepEqual(hud.root.children.map(item => item.children[1].textContent), ['29s', '3', '4', '1.6', '4.3/s', '3', '2.6', '35']);
     assert.equal(hud.root.children[1].attributes['aria-label'], 'Leben: 3');
     assert.equal(hud.counter.attributes['aria-label'], 'Münzen: 35');
     assert.equal(hud.counter.children[1].textContent, '35');
@@ -42,4 +42,13 @@ test('coin count updates while maintaining the same counter element for animatio
     hud.update({...progress, coins: 10});
     assert.equal(hud.counter, coin);
     assert.equal(coin.children[1].textContent, '10');
+});
+
+test('runner shows absolute volley damage and actual attack rate, not multipliers', () => {
+    const hud = createRunnerHud(document);
+    hud.update({...progress, temporary: {...progress.temporary, damage: 2, fireRate: 2}});
+    assert.equal(hud.root.children[3].children[1].textContent, '2.0');
+    assert.equal(hud.root.children[4].children[1].textContent, '7.1/s');
+    assert.equal(hud.root.children[3].attributes['aria-label'], 'Schaden pro Schussserie: 2.0');
+    assert.equal(hud.root.children[4].attributes['aria-label'], 'Schussserien pro Sekunde: 7.1/s');
 });
