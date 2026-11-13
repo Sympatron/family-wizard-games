@@ -14,6 +14,7 @@ import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
+import {COIN_ATTRACT_SECONDS, COIN_COUNTER_SECONDS, interpolateCoinFlight} from './coin-flight.js';
 import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
 import {volleyPattern, initialRunnerWeaponStats} from './shots.js';
@@ -166,17 +167,18 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     const bullets = [];
     const particles = [];
     const damageLabels = [];
+    const coinFlights = [];
     const hitSound = createHitSound();
     const notices = createRunnerNotice();
     const collected = [];
     const followers = [];
-    const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
+    const followerOffsets = [-1.8, 1.8, -3.6, 0, 3.6];
     function collectDinosaur(species, level = 1) {
         collected.push({species, level});
         notices.show(DINOSAURS[species].name + ' befreit!');
         if (followers.length >= 15) return;
         const follower = dinosaur(species, DINOSAURS[species].color);
-        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.62 : 0.56);
+        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.83 : 0.77);
         follower.position.set(player.position.x, 0, 9.4);
         scene.add(follower);
         followers.push(follower);
@@ -188,6 +190,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     let shots = 0;
     let kills = 0;
     let runnerCoins = 0;
+    let displayCoins = 0;
     let spawnCount = 0;
     let nextSpawn = 0.5;
     let nextCoinWave = 1.1;
@@ -278,7 +281,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     function cage(species, rarity = 'common') {
         const group = new THREE.Group();
         const creature = dinosaur(species, DINOSAURS[species].color, true);
-        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.82 : 0.84);
+        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.98 : 1.02);
         creature.rotation.y = Math.PI;
         group.add(creature);
         const barLayout = cageBarLayout();
@@ -344,12 +347,12 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     }
     function floatDamage(x, y, z, amount) {
         if (amount <= 0) return;
-        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 2.25, 1.05, 220, '#ffcf9e');
+        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 3.8, 1.7, 220, '#ffcf9e');
         sprite.material.depthTest = false;
         sprite.renderOrder = 25;
-        sprite.position.set(x, y + 0.25, z + 2);
+        sprite.position.set(x, y + 1.5, z + 5);
         scene.add(sprite);
-        damageLabels.push({sprite, remaining: 0.65});
+        damageLabels.push({sprite, remaining: 0.9});
     }
     function createFinishGoal() {
         const group = new THREE.Group();
@@ -600,9 +603,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         for (let i = damageLabels.length - 1; i >= 0; i--) {
             const label = damageLabels[i];
             label.remaining -= dt;
-            label.sprite.position.y += 2.2 * dt;
+            label.sprite.position.y += 3 * dt;
             label.sprite.position.z += speed * dt;
-            label.sprite.material.opacity = Math.max(0, label.remaining / 0.65);
+            label.sprite.material.opacity = Math.max(0, label.remaining / 0.9);
             if (label.remaining <= 0) {
                 scene.remove(label.sprite);
                 label.sprite.material.map?.dispose();
