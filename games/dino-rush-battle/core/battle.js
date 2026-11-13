@@ -92,7 +92,7 @@ function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
     const unitMax = team === 'player' ? maxHp(unit, upgrades) : Math.max(1, unit.hp);
     return {
         id: unit.id, team, species: unit.species, level: unit.level,
-        x: team === 'player' ? 250 - depth * 27 : 710 + depth * 27,
+        x: team === 'player' ? 140 - depth * 8 : 820 + depth * 8,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
         speed: species.speed, range: species.range, damage: Math.round(species.damage * unitPower(unit) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
