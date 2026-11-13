@@ -33,7 +33,7 @@ export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}
             const target = targets[0];
             const d = distance(unit, target);
             if (d > unit.range) {
-                const stepDistance = Math.min(d - unit.range + 1, unit.speed * TICK * (step < 15 ? 2.1 : 1));
+                const stepDistance = Math.min(d - unit.range + 1, unit.speed * TICK);
                 unit.x += (target.x - unit.x) / d * stepDistance;
                 unit.y += (target.y - unit.y) / d * stepDistance;
             } else if (unit.cooldown <= 0) {
@@ -92,7 +92,7 @@ function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
     const unitMax = team === 'player' ? maxHp(unit, upgrades) : Math.max(1, unit.hp);
     return {
         id: unit.id, team, species: unit.species, level: unit.level,
-        x: team === 'player' ? 140 - depth * 8 : 820 + depth * 8,
+        x: team === 'player' ? 80 - depth * 8 : 880 + depth * 8,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
         speed: species.speed, range: species.range, damage: Math.round(species.damage * unitPower(unit) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
