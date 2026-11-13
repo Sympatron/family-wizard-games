@@ -6,6 +6,7 @@ import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
 import {BattleView} from './battle/view.js';
+import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
 const stage = document.querySelector('.dino-stage');
@@ -64,15 +65,18 @@ function chooseEvolution(ids, choices) {
     description.textContent = choices.length === 1 ? 'Zwei gleiche Dinos werden zum nächsten Tier fusioniert.' : 'Wähle die nächste Art für zwei gleiche Tier-III-Dinos:';
     const buttons = document.createElement('div');
     buttons.className = 'dino-merge-options';
+    const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
     for (const species of choices) {
-        const source = state.game.run.army.concat(state.game.run.inventory).find(unit => unit.id === ids[0]);
-        const label = source?.species === species ? SPECIES[species].name + ' · Tier ' + (source.level + 1) : SPECIES[species].name + ' · Tier I';
-        addButton(buttons, label, () => {
+        const level = source?.species === species ? source.level + 1 : 1;
+        const button = createEvolutionChoiceButton(document, species, level, state.game.meta.upgrades, state.game.run.battleUpgrades);
+        button.addEventListener('click', () => {
             mergeDialog.close();
             void execute('merge', {ids, into: species});
         });
+        buttons.append(button);
     }
-    addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    const cancel = addButton(buttons, 'Abbrechen', () => mergeDialog.close());
+    cancel.className = 'dino-merge-cancel';
     mergeDialog.append(title, description, buttons);
     mergeDialog.showModal();
 }
