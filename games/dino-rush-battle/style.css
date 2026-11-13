@@ -159,3 +159,23 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-stage.runner #message {top:125px;}
   .dino-stage.runner .dino-gate-guide {top:190px;}
 }
+
+.dino-stage.rewards #actions {max-width:980px;gap:16px;}
+.dino-shop-section {width:100%;min-width:0;}
+.dino-shop-section h3 {margin:0 0 10px;font-size:1.05rem;color:#f4dfa0;text-align:left;}
+.dino-shop-gun-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+#actions .dino-shop-gun-upgrade {min-height:74px;padding:12px 9px;line-height:1.45;white-space:normal;background:#315365;color:#f5f5e7;border:1px solid #7ac6b9;}
+.dino-heal-list {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:10px;}
+#actions .dino-heal-card {display:flex;align-items:center;gap:11px;min-width:0;min-height:104px;padding:11px;background:#25414f;border:1px solid #68a99b;color:#f1f7f2;text-align:left;}
+.dino-heal-card img {width:80px;height:68px;flex:0 0 80px;object-fit:contain;border-radius:9px;background:#19313d;}
+.dino-heal-details {display:flex;min-width:0;flex-direction:column;gap:5px;font-size:.85rem;font-weight:500;}
+.dino-heal-details strong {font-size:.94rem;}
+.dino-heal-price {color:#ffdc8b;}
+#actions .dino-heal-card:focus-visible,#actions .dino-shop-gun-upgrade:focus-visible {outline:3px solid #f9d990;outline-offset:2px;}
+@media (max-width:650px) {
+  .dino-shop-gun-grid {grid-template-columns:1fr;gap:6px;}
+  #actions .dino-shop-gun-upgrade {min-height:48px;padding:8px;}
+  .dino-heal-list {grid-template-columns:1fr;gap:7px;}
+  #actions .dino-heal-card {min-height:78px;padding:7px;}
+  .dino-heal-card img {width:62px;height:52px;flex-basis:62px;}
+}
