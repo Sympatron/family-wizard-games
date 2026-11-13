@@ -41,7 +41,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         scene.add(mesh);
         return mesh;
     }
-    function dinosaur(species, color) {
+    function dinosaur(species, color, caged = false) {
         const result = new THREE.Group();
         const def = DINOSAURS[species];
         const skin = material(color);
@@ -104,9 +104,10 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             if (def.trait === 'armor' || def.trait === 'reflect') sphere(0.42, dark, 0, 1.12, 2.38);
         } else if (wings) {
             for (const side of [-1, 1]) {
-                const wing = piece(new THREE.ConeGeometry(0.9, 2.7, 4), dark, side * 1.08, 1.78, 0.13);
+                const wing = piece(new THREE.ConeGeometry(caged ? 0.46 : 0.9, caged ? 1.4 : 2.7, 4),
+                    dark, side * (caged ? 0.62 : 1.08), 1.78, 0.13);
                 wing.rotation.z = side * Math.PI / 2;
-                const claw = piece(new THREE.ConeGeometry(0.13, 0.6, 6), teeth, side * 1.48, 1.88, -0.5);
+                const claw = piece(new THREE.ConeGeometry(0.13, 0.6, 6), teeth, side * (caged ? 0.95 : 1.48), 1.88, -0.5);
                 claw.rotation.x = -0.55;
             }
             const beak = piece(new THREE.ConeGeometry(0.25, 1.12, 5), belly, 0, 1.81, -1.46);
@@ -262,8 +263,8 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     }
     function cage(species, rarity = 'common') {
         const group = new THREE.Group();
-        const creature = dinosaur(species, DINOSAURS[species].color);
-        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.88 : 0.84);
+        const creature = dinosaur(species, DINOSAURS[species].color, true);
+        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.82 : 0.84);
         creature.rotation.y = Math.PI;
         group.add(creature);
         const barLayout = cageBarLayout();
