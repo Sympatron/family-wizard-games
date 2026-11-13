@@ -1,5 +1,5 @@
 import {SPECIES, maxHp} from '../core/game.js';
-import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
+import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt, reserveSidebar, reserveUnitPosition} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
 
 const Phaser = window.Phaser;
@@ -49,6 +49,7 @@ export class BattleView {
     }
 
     preload(scene) {
+        scene.load.svg('dino-battlefield', './assets/battlefield.svg', {width: 960, height: 620});
         for (const species of Object.keys(SPECIES)) {
             scene.load.svg('dino-' + species, './assets/dinos/' + species + '.svg', {width: 160, height: 128});
         }
@@ -58,31 +59,34 @@ export class BattleView {
         if (this.destroyed) return;
         this.scene = scene;
         const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
-        const background = scene.add.graphics();
-        background.fillStyle(0x213a44, 1);
-        background.fillRoundedRect(this.portrait ? 14 : 250, 328, this.portrait ? 512 : 460, 174, 15);
-        background.fillStyle(0x47373f, 1);
-        background.fillRoundedRect(this.portrait ? 14 : 250, 42, this.portrait ? 512 : 460, 174, 15);
-        const grid = scene.add.graphics();
+        const sidebar = reserveSidebar(this.portrait);
+        const fieldCenter = sidebar.left / 2;
+        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(width, 620).setDepth(-10);
+        const background = scene.add.graphics().setDepth(-4);
+        background.fillStyle(0x223c36, 0.68);
+        background.fillRoundedRect(8, 328, sidebar.left - 16, 174, 15);
+        background.fillStyle(0x483a3e, 0.7);
+        background.fillRoundedRect(8, 42, sidebar.left - 16, 174, 15);
+        const grid = scene.add.graphics().setDepth(-3);
         for (const team of ['player', 'enemy']) {
             for (let cell = 0; cell < 15; cell++) {
                 const {x, y} = this.cellCenter(team, cell);
-                grid.lineStyle(1.5, team === 'player' ? 0x8cb6b0 : 0xc6a7a2, 0.75);
-                grid.fillStyle(team === 'player' ? 0x325a58 : 0x62494b, 0.75);
+                grid.lineStyle(1.5, team === 'player' ? 0x8cb6b0 : 0xc6a7a2, 0.85);
+                grid.fillStyle(team === 'player' ? 0x325a58 : 0x62494b, 0.82);
                 grid.fillRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
                 grid.strokeRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
             }
         }
-        scene.add.text(width / 2, 316, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
-        scene.add.text(width / 2, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
-        this.hint = scene.add.text(width / 2, 270, '', {fontFamily: 'system-ui', fontSize: '19px', color: '#b4d6d9'}).setOrigin(0.5);
-        this.reserveBackground = scene.add.rectangle(width / 2, 561, width - 16, 115, 0x223c48, 0.95);
-        this.reserveTitle = scene.add.text(width / 2, 522, '', {fontFamily: 'system-ui', fontSize: '19px', color: '#d7e5f5'}).setOrigin(0.5);
+        this.formationLayers = [background, grid,
+            scene.add.text(fieldCenter, 540, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#b4e4c4'}).setOrigin(0.5).setDepth(4),
+            scene.add.text(fieldCenter, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#ffc49b'}).setOrigin(0.5).setDepth(4)];
+        this.reserveBackground = scene.add.rectangle(sidebar.center, 310, sidebar.width - 4, 610, 0x142a36, 0.95).setDepth(-2);
+        this.reserveTitle = scene.add.text(sidebar.center, 25, '', {fontFamily: 'system-ui', fontSize: this.portrait ? '13px' : '17px', fontStyle: 'bold', color: '#d7e5f5'}).setOrigin(0.5).setDepth(3);
         this.reserveButtons = [-1, 1].map(direction => {
-            const x = direction === -1 ? 36 : width - 36;
-            const backing = scene.add.rectangle(x, 568, 66, 82, 0x42677a, 0.96).setDepth(2);
-            const arrow = scene.add.text(x, 565, direction === -1 ? '‹' : '›',
-                {fontFamily: 'system-ui', fontSize: '58px', color: '#f0ca7c'}).setOrigin(0.5).setDepth(3);
+            const x = sidebar.center + direction * (this.portrait ? 28 : 42);
+            const backing = scene.add.rectangle(x, 588, this.portrait ? 46 : 64, 46, 0x42677a, 0.96).setDepth(2);
+            const arrow = scene.add.text(x, 585, direction === -1 ? '‹' : '›',
+                {fontFamily: 'system-ui', fontSize: '35px', color: '#f0ca7c'}).setOrigin(0.5).setDepth(3);
             return {backing, arrow};
         });
         this.dropMarker = scene.add.graphics().setDepth(5);
@@ -101,7 +105,7 @@ export class BattleView {
     toScreen(x, y) { return toCombatScreen(x, y, this.portrait); }
     cellCenter(team, cell) { return battleCellCenter(team, cell, this.portrait); }
     cellAt(x, y) { return battleCellAt(x, y, this.portrait); }
-    get reservePageSize() { return this.portrait ? 7 : 13; }
+    get reservePageSize() { return 9; }
     get width() { return this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width; }
 
     pointAtClient(clientX, clientY) {
@@ -119,9 +123,8 @@ export class BattleView {
     reserveUnits() {
         const from = this.reservePage * this.reservePageSize;
         const visible = this.inventory.slice(from, from + this.reservePageSize);
-        const firstX = (this.width - (visible.length - 1) * 59) / 2;
         return visible.map((unit, index) => ({
-            id: unit.id, team: 'reserve', species: unit.species, level: unit.level, x: firstX + index * 59, y: 568,
+            id: unit.id, team: 'reserve', species: unit.species, level: unit.level, ...reserveUnitPosition(index, this.portrait),
             hp: unit.hp, maxHp: maxHp(unit, this.upgrades)
         }));
     }
@@ -133,14 +136,14 @@ export class BattleView {
     }
 
     unitAtPoint(x, y, excludeId = null) {
-        const units = y >= 525 ? this.reserveUnits() : this.army.map(unit => ({
+        const units = x >= reserveSidebar(this.portrait).left ? this.reserveUnits() : this.army.map(unit => ({
             id: unit.id, ...this.cellCenter('player', unit.cell)
         }));
         return units.find(unit => unit.id !== excludeId && Math.hypot(unit.x - x, unit.y - y) <= 29)?.id ?? null;
     }
 
     targetAtPoint(x, y, excludeId = null) {
-        if (y >= 527 && y <= 618 && x >= 0 && x <= this.width) {
+        if (x >= reserveSidebar(this.portrait).left && y >= 55 && y <= 559) {
             const unitId = this.unitAtPoint(x, y, excludeId);
             return unitId ? {unitId, reserve: true} : {reserve: true};
         }
@@ -160,7 +163,10 @@ export class BattleView {
         this.dropMarker.clear();
         if (!target || this.mode !== 'formation') return;
         this.dropMarker.lineStyle(4, 0xffe59b, 1);
-        if (target.reserve) this.dropMarker.strokeRoundedRect(7, 508, this.width - 14, 108, 12);
+        if (target.reserve) {
+            const sidebar = reserveSidebar(this.portrait);
+            this.dropMarker.strokeRoundedRect(sidebar.left + 4, 54, sidebar.width - 8, 504, 12);
+        }
         else if (Number.isInteger(target.cell)) {
             const {x, y} = this.cellCenter('player', target.cell);
             this.dropMarker.strokeRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
@@ -176,8 +182,9 @@ export class BattleView {
         if (this.mode !== 'formation' || (event.pointerType === 'mouse' && event.button !== 0)) return;
         const point = this.pointAtClient(event.clientX, event.clientY);
         if (!point) return;
-        if (point.y >= 535 && point.y <= 610 && (point.x <= 70 || point.x >= this.width - 70)) {
-            this.changeReservePage(point.x <= 70 ? -1 : 1);
+        const sidebar = reserveSidebar(this.portrait);
+        if (point.x >= sidebar.left && point.y >= 562 && point.y <= 620) {
+            this.changeReservePage(point.x < sidebar.center ? -1 : 1);
             event.preventDefault();
             return;
         }
@@ -356,12 +363,12 @@ export class BattleView {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
         }
-        this.hint.setText(isFormation ? 'Drag & Drop: bewegen oder fusionieren' : 'KAMPF LÄUFT ...');
+        for (const layer of this.formationLayers) layer.setVisible(isFormation);
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
         }
         const pageCount = Math.max(1, Math.ceil(this.inventory.length / this.reservePageSize));
-        this.reserveTitle.setText('VORRAT (' + this.inventory.length + ') · ' + (this.reservePage + 1) + '/' + pageCount);
+        this.reserveTitle.setText('VORRAT ' + this.inventory.length + ' · ' + (this.reservePage + 1) + '/' + pageCount);
         this.reserveButtons[0].backing.setVisible(isFormation && this.reservePage > 0);
         this.reserveButtons[0].arrow.setVisible(isFormation && this.reservePage > 0);
         this.reserveButtons[1].backing.setVisible(isFormation && this.reservePage < pageCount - 1);
