@@ -1,4 +1,4 @@
-import {SPECIES, maxHp} from './game.js';
+import {SPECIES, maxHp, unitPower} from './game.js';
 
 const TICK = 0.1;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -95,7 +95,7 @@ function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
         x: team === 'player' ? 250 - depth * 27 : 710 + depth * 27,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
-        speed: species.speed, range: species.range, damage: Math.round(species.damage * (1 + (unit.level - 1) * 0.2) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
+        speed: species.speed, range: species.range, damage: Math.round(species.damage * unitPower(unit) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
         trait: unit.trait ?? species.trait, poison: 0, receivedAttacks: 0,
         attackTime: species.cooldown * ((unit.trait ?? species.trait) === 'rapid' ? 0.82 : 1),
         cooldown: 0.2, stunned: 0, attacks: 0

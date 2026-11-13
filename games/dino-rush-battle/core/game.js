@@ -17,8 +17,12 @@ export const INITIAL_GAME = {
     meta: {currency: 0, upgrades: {starterHp: 0, runnerDamage: 0}},
     run: createRun()
 };
+export function unitPower(unit) {
+    const rank = SPECIES[unit.species].rank;
+    return Math.pow(1.8, Math.max(0, Math.min(MAX_TIER, unit.level ?? 1) - 1)) * Math.pow(1.35, 3 * (rank - 1));
+}
 export function maxHp(unit, upgrades = {}) {
-    return Math.round(SPECIES[unit.species].hp * (1 + (unit.level - 1) * 0.2) * (1 + (upgrades.starterHp ?? 0) * 0.08));
+    return Math.round(SPECIES[unit.species].hp * unitPower(unit) * (1 + (upgrades.starterHp ?? 0) * 0.08));
 }
 export function createRun() {
     return {
@@ -31,13 +35,13 @@ export function getEnemies(stage) {
     const starters = ['raptor', 'triceratops', 'pteranodon'];
     const advanced = ['allosaurus', 'troodon', 'ankylosaurus', 'stegosaurus', 'quetzalcoatlus', 'tapejara'];
     const elite = ['carnotaurus', 'dilophosaurus', 'euoplocephalus', 'kentrosaurus', 'hatzegopteryx', 'caiuajara'];
-    return Array.from({length: Math.min(3 + stage, 12)}, (_, i) => {
-        const species = stage >= 14 && i % 5 === 0 ? elite[(stage + i) % elite.length]
-            : stage >= 6 && i % 4 === 0 ? advanced[(stage + i) % advanced.length]
+    return Array.from({length: Math.min(stage === 1 ? 4 : 3 + Math.floor((stage + 1) / 2), 10)}, (_, i) => {
+        const species = stage >= 26 && i % 7 === 0 ? elite[(stage + i) % elite.length]
+            : stage >= 14 && i % 5 === 0 ? advanced[(stage + i) % advanced.length]
             : starters[(i + stage) % starters.length];
-        const level = stage >= 12 && i % 3 === 0 ? 3 : stage >= 5 && i % 3 === 0 ? 2 : 1;
+        const level = stage >= 17 && i % 4 === 0 ? 3 : stage >= 8 && i % 4 === 0 ? 2 : 1;
         const unit = {id: 'e' + i, species, level, cell: i};
-        return {...unit, hp: Math.round(maxHp(unit) * (0.82 + stage * 0.035))};
+        return {...unit, hp: Math.round(maxHp(unit) * (0.78 + stage * 0.022))};
     });
 }
 export function nextFreeCell(army, species) {

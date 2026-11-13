@@ -1,7 +1,7 @@
 import {createGameBackend} from '../../shared/backend.js';
 import {mountDevtools} from '../../shared/devtools.js';
 import {watchDeployment} from '../../shared/deploy-watch.js';
-import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame} from './core/game.js';
+import {INITIAL_GAME, SPECIES, getEnemies, mergeOptions, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
 import {simulateBattle} from './core/battle.js';
@@ -227,7 +227,7 @@ function renderFormationStats(unit, run) {
     }
     const type = SPECIES[unit.species];
     const maximum = maxHp(unit, state.game.meta.upgrades);
-    const damage = Math.round(type.damage * (1 + (unit.level - 1) * 0.2) * (1 + run.battleUpgrades.damage * 0.15));
+    const damage = Math.round(type.damage * unitPower(unit) * (1 + run.battleUpgrades.damage * 0.15));
     const make = (tag, className, content) => {
         const element = document.createElement(tag);
         element.className = className;
