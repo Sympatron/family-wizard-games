@@ -71,9 +71,15 @@ export function reduceGame(game, action) {
         case 'complete-runner': {
             if (run.phase !== 'runner') fail('Der Lauf ist nicht aktiv.');
             const collected = action.payload?.collected;
-            if (!Array.isArray(collected) || collected.length > 50 || collected.some(id => !SPECIES[id])) fail('Ungültige Dinosaurier.');
-            for (const species of collected) {
-                const unit = {id: 'd' + run.nextId++, species, level: 1, hp: 0, cell: null};
+            if (!Array.isArray(collected) || collected.length > 30 || collected.some(item => {
+                const species = typeof item === 'string' ? item : item?.species;
+                const level = typeof item === 'string' ? 1 : item?.level;
+                return !SPECIES[species] || !Number.isInteger(level) || level < 1 || level > MAX_TIER || SPECIES[species].rank > 2;
+            })) fail('Ungültige Dinosaurier.');
+            for (const item of collected) {
+                const species = typeof item === 'string' ? item : item.species;
+                const level = typeof item === 'string' ? 1 : item.level;
+                const unit = {id: 'd' + run.nextId++, species, level, hp: 0, cell: null};
                 unit.hp = maxHp(unit, next.meta.upgrades);
                 const cell = nextFreeCell(run.army, unit.species);
                 if (cell === null) run.inventory.push(unit);
@@ -102,7 +108,8 @@ export function reduceGame(game, action) {
             const priority = {Tank: 0, Nahkampf: 1, Fernkampf: 2};
             const pool = [...run.army, ...run.inventory];
             pool.sort((a, b) => Number(b.hp > 0) - Number(a.hp > 0) ||
-                priority[SPECIES[a.species].role] - priority[SPECIES[b.species].role] || b.level - a.level);
+                priority[SPECIES[a.species].role] - priority[SPECIES[b.species].role] ||
+                SPECIES[b.species].rank - SPECIES[a.species].rank || b.level - a.level);
             run.army = pool.slice(0, 15).map((unit, i) => ({...unit, cell: i}));
             run.inventory = pool.slice(15).map(unit => ({...unit, cell: null}));
             return {game: next, message: 'Dein Team wurde automatisch aufgestellt.'};
