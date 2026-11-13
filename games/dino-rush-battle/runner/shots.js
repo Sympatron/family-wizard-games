@@ -1,5 +1,6 @@
 import {BASE_PICKUP_RANGE} from './coins.js';
 export const MAX_BULLETS = 5;
+export const SHOT_INTERVAL_SECONDS = 0.28;
 export function volleyPattern(count, totalDamage) {
     if (!Number.isInteger(count) || count < 1 || count > MAX_BULLETS || !(totalDamage > 0) || !Number.isFinite(totalDamage)) {
         throw new Error('Ungültige Schusswerte.');
