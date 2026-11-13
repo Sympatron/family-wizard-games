@@ -15,7 +15,7 @@ export function toBattleScreen(x, y, portrait) {
 }
 
 export function toCombatScreen(x, y, portrait) {
-    return {...toBattleScreen(x, y, portrait), y: 310 + (480 - x) * 0.72};
+    return {...toBattleScreen(x, y, portrait), y: 310 + (480 - x) * 0.6};
 }
 
 export function battleCellCenter(team, cell, portrait) {
