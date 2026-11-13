@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {SPECIES} from '../games/dino-rush-battle/core/game.js';
-import {drawBattlefield} from '../games/dino-rush-battle/battle/terrain.js';
 
 globalThis.window = {Phaser: {}};
 const {BattleView} = await import('../games/dino-rush-battle/battle/view.js');
@@ -24,7 +23,9 @@ test('every combat dinosaur has unique illustrated SVG artwork', async () => {
 test('Phaser preloads matching dinosaur SVG textures', () => {
     const loaded = [];
     const view = Object.create(BattleView.prototype);
-    view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config})}});
+    const backgrounds = [];
+    view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config}), image: (key, url) => backgrounds.push({key, url})}});
+    assert.deepEqual(backgrounds, [{key: 'dino-battlefield', url: './assets/battlefield.avif'}]);
     assert.equal(loaded.length, Object.keys(SPECIES).length);
     for (const species of Object.keys(SPECIES)) {
         assert.deepEqual(loaded.find(item => item.key === 'dino-' + species), {
@@ -33,24 +34,8 @@ test('Phaser preloads matching dinosaur SVG textures', () => {
     }
 });
 
-test('battlefield is a deterministic textured top-down ground texture, not a horizon illustration', () => {
-    function makeContext() {
-        const context = {
-            image: null,
-            createImageData(width, height) {return {data: new Uint8ClampedArray(width * height * 4)};},
-            putImageData(image) {this.image = image;},
-            save() {}, restore() {}, translate() {}, rotate() {}, beginPath() {}, ellipse() {}, fill() {},
-            moveTo() {}, lineTo() {}, closePath() {}, arc() {}, stroke() {}, quadraticCurveTo() {}
-        };
-        return context;
-    }
-    const first = makeContext(), second = makeContext();
-    drawBattlefield(first, 96, 64);
-    drawBattlefield(second, 96, 64);
-    assert.deepEqual(first.image.data, second.image.data);
-    const pixels = first.image.data;
-    assert.equal(pixels.length, 96 * 64 * 4);
-    assert.ok(Array.from({length: 96 * 64}, (_, i) => pixels[i * 4 + 3]).every(alpha => alpha === 255));
-    const colors = new Set(Array.from({length: 96 * 64}, (_, i) => [pixels[4 * i], pixels[4 * i + 1], pixels[4 * i + 2]].join(',')));
-    assert.ok(colors.size > 1000, 'natural terrain should have rich variation rather than flat vector fills');
+test('battlefield background is a committed raster AVIF image', async () => {
+    const image = await readFile(new URL('../games/dino-rush-battle/assets/battlefield.avif', import.meta.url));
+    assert.ok(image.length > 5000);
+    assert.equal(image.toString('ascii', 4, 12), 'ftypavif');
 });
