@@ -84,9 +84,9 @@ export function reduceGame(game, action) {
             }
             const temporary = action.payload?.temporary ?? {};
             run.temporary = {
-                damage: Math.max(0.25, Math.min(6, Number(temporary.damage) || 1)),
-                fireRate: Math.max(0.25, Math.min(6, Number(temporary.fireRate) || 1)),
-                bullets: Math.max(1, Math.min(7, Math.floor(Number(temporary.bullets) || 1)))
+                damage: Math.max(0.25, Math.min(3, Number(temporary.damage) || 1)),
+                fireRate: Math.max(0.25, Math.min(2.5, Number(temporary.fireRate) || 1)),
+                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1)))
             };
             const coins = action.payload?.coins ?? 0;
             if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');

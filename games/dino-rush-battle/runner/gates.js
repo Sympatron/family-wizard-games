@@ -26,9 +26,9 @@ export function applyGate(temporary, gate) {
     const current = next[gate.modifier];
     if (!Number.isFinite(current)) throw new Error('Ungültiger Bonus');
     if (gate.operation === 'multiply') next[gate.modifier] = current * gateValue(gate);
-    else next[gate.modifier] = current + gate.level * (gate.modifier === 'bullets' ? 1 : gate.modifier === 'damage' ? 0.5 : 0.25);
-    if (gate.modifier === 'bullets') next.bullets = bound(Math.round(next.bullets), 1, 7);
-    else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100, 0.25, 6);
+    else next[gate.modifier] = current + gate.level * (gate.modifier === 'bullets' ? 1 : gate.modifier === 'damage' ? 0.3 : 0.12);
+    if (gate.modifier === 'bullets') next.bullets = bound(Math.round(next.bullets), 1, 5);
+    else next[gate.modifier] = bound(Math.round(next[gate.modifier] * 100) / 100, 0.3, gate.modifier === 'fireRate' ? 2.5 : 3);
     return next;
 }
 
