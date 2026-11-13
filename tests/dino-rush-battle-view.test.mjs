@@ -6,7 +6,7 @@ const {BattleView, MASTERY_APPEARANCE} = await import('../games/dino-rush-battle
 
 const makeElement = () => {
     const object = {x: 0, y: 0, depth: 1};
-    for (const method of ['setDepth', 'setDisplaySize', 'fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect', 'setOrigin', 'setVisible', 'setText', 'clear']) {
+    for (const method of ['setDepth', 'setDisplaySize', 'setStrokeStyle', 'fillStyle', 'fillRoundedRect', 'lineStyle', 'strokeRoundedRect', 'setOrigin', 'setVisible', 'setText', 'clear']) {
         object[method] = () => object;
     }
     object.setPosition = (x, y) => { object.x = x; object.y = y; return object; };
