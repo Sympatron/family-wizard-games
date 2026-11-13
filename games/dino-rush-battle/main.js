@@ -280,6 +280,12 @@ async function beginRunner() {
     }
     heading.textContent = 'Stufe ' + game.run.stage + ' — Dino Rush';
     actions.replaceChildren();
+    const runnerHudText = document.createTextNode('');
+    const runnerCoinCounter = document.createElement('span');
+    runnerCoinCounter.id = 'runner-coin-counter';
+    runnerCoinCounter.className = 'dino-runner-coins';
+    runnerCoinCounter.textContent = 'Münzen 0';
+    hud.replaceChildren(runnerHudText, runnerCoinCounter);
     help.textContent = '← → oder wischen zum Steuern, P oder Pause zum Anhalten. Schieße auf Käfige und Tore; Magnet-Tore erhöhen die Münzreichweite.';
     try {
         const {startRunner} = await import('./runner/runner.js');
@@ -296,10 +302,10 @@ async function beginRunner() {
             message.textContent = paused ? 'Pausiert – mit Weiter oder P fortsetzen' : '';
         },
         onProgress: progress => {
-            hud.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
+            runnerHudText.textContent = 'Zeit ' + progress.seconds + 's · Leben ' + progress.hp + ' · Dinos ' + progress.collected +
                 ' · Schaden ×' + progress.temporary.damage.toFixed(1) + ' · Tempo ×' + progress.temporary.fireRate.toFixed(1) +
-                ' · Kugeln ' + progress.temporary.bullets + ' · Magnet ' + progress.temporary.pickupRange.toFixed(1) +
-                ' · Münzen ' + (progress.coins ?? 0);
+                ' · Kugeln ' + progress.temporary.bullets + ' · Magnet ' + progress.temporary.pickupRange.toFixed(1) + ' · ';
+            runnerCoinCounter.textContent = 'Münzen ' + (progress.coins ?? 0);
             message.textContent = progress.notice ?? '';
         },
         onFinish: result => void execute('complete-runner', result)
