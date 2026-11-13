@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 globalThis.window = {Phaser: {}};
-const {BattleView} = await import('../games/dino-rush-battle/battle/view.js');
+const {BattleView, MASTERY_APPEARANCE} = await import('../games/dino-rush-battle/battle/view.js');
 
 const makeElement = () => {
     const object = {x: 0, y: 0, depth: 1};
@@ -118,4 +118,15 @@ test('mouse clicks and short touch taps can inspect units but never move or merg
         send('pointerup', view.cellCenter('player', 6), 7, pointerType);
         assert.deepEqual(events, [{type: 'select', id: 'd1'}, {type: 'select', id: 'd2'}]);
     }
+});
+
+test('mastery tiers have distinct sizes, fill colors and outlines', () => {
+    assert.equal(MASTERY_APPEARANCE.length, 3);
+    assert.ok(MASTERY_APPEARANCE[0].width < MASTERY_APPEARANCE[1].width);
+    assert.ok(MASTERY_APPEARANCE[1].width < MASTERY_APPEARANCE[2].width);
+    assert.ok(MASTERY_APPEARANCE[0].height < MASTERY_APPEARANCE[1].height);
+    assert.ok(MASTERY_APPEARANCE[1].height < MASTERY_APPEARANCE[2].height);
+    assert.equal(new Set(MASTERY_APPEARANCE.map(tier => tier.halo)).size, 3);
+    assert.equal(new Set(MASTERY_APPEARANCE.map(tier => tier.border)).size, 3);
+    assert.equal(new Set(MASTERY_APPEARANCE.map(tier => tier.label)).size, 3);
 });
