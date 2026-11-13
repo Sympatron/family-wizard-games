@@ -1,7 +1,6 @@
 import {SPECIES, maxHp, getMergeChoices} from '../core/game.js';
 import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt, reserveSidebar, reserveUnitPosition} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
-import {drawBattlefield} from './terrain.js';
 
 const Phaser = window.Phaser;
 export const MASTERY_APPEARANCE = Object.freeze([
@@ -50,6 +49,7 @@ export class BattleView {
     }
 
     preload(scene) {
+        scene.load.image('dino-battlefield', './assets/battlefield.avif');
         for (const species of Object.keys(SPECIES)) {
             scene.load.svg('dino-' + species, './assets/dinos/' + species + '.svg', {width: 160, height: 128});
         }
@@ -61,12 +61,7 @@ export class BattleView {
         const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
         const sidebar = reserveSidebar(this.portrait);
         const fieldCenter = sidebar.left / 2;
-        const terrain = scene.textures?.createCanvas('dino-battlefield', 960, 620);
-        if (terrain) {
-            drawBattlefield(terrain.context);
-            terrain.refresh();
-        }
-        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(960, 620).setDepth(-10);
+        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDisplaySize(1102, 620).setDepth(-10);
         const background = scene.add.graphics().setDepth(-4);
         background.fillStyle(0x223c36, 0.68);
         background.fillRoundedRect(8, 328, sidebar.left - 16, 174, 15);
