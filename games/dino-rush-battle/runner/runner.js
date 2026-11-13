@@ -5,7 +5,8 @@ try {
     THREE = await import('https://unpkg.com/three@0.187.0/build/three.module.js');
 }
 import {SPECIES as DINOSAURS} from '../core/game.js';
-import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
+import {createGatePair, createSingleGate, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
+import {paintRunnerStatIcon} from './hud.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
 import {createRunnerWave, blockedByGate} from './spawns.js';
@@ -232,6 +233,27 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         sprite.position.set(0, y, 0.35);
         return sprite;
     }
+    function gateStatIcon(modifier) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#19303b';
+        ctx.strokeStyle = '#f5d18b';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(128, 128, 116, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(38, 38);
+        paintRunnerStatIcon(ctx, modifier, 180);
+        ctx.restore();
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
+        sprite.position.set(0, 6.3, 0.6);
+        sprite.scale.set(2, 2, 1);
+        return sprite;
+    }
     function updateGate(obj) {
         const positive = obj.level > 0;
         const color = positive ? 0x5bc8c0 : obj.level < 0 ? 0xe57366 : 0xd5c774;
@@ -247,33 +269,37 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         const [type, value] = gateLabel(obj).split(' ');
         const label = new THREE.Group();
         const accent = positive ? '#8bffe0' : obj.level < 0 ? '#ff998c' : '#ffec96';
-        label.add(gateText(type, 4.55, 5.95, 1.25, 172, '#ffffff', accent));
-        label.add(gateText(value, 2.1, 5.85, 2.55, 225, '#fff4b6', accent));
+        const labelWidth = (obj.width ?? 6.1) - 0.2;
+        label.add(gateText(type, 4.55, labelWidth, 1.25, 172, '#ffffff', accent));
+        label.add(gateText(value, 2.1, labelWidth, 2.55, 225, '#fff4b6', accent));
         obj.label = label;
         obj.group.add(label);
     }
-    function spawnGatePair(goalZ) {
+    function spawnGates(goalZ) {
         if (!canSpawnBeforeGoal(-80, goalZ, 6)) return;
         const pairId = gateCount++;
-        for (const [index, definition] of createGatePair(stage, pairId).entries()) {
-            const x = index === 0 ? -3.2 : 3.2;
+        const definitions = pairId % 2 === 0 ? createGatePair(stage, pairId) : [createSingleGate(stage, pairId)];
+        for (const [index, definition] of definitions.entries()) {
+            const x = definition.x ?? (index === 0 ? -3.2 : 3.2);
+            const width = definition.width ?? 6.1;
             const group = new THREE.Group();
-            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6.1, 4.1), new THREE.MeshBasicMaterial({
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, 4.1), new THREE.MeshBasicMaterial({
                 color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide
             }));
             mesh.position.y = 2.05;
             group.add(mesh);
-            const header = new THREE.Mesh(new THREE.BoxGeometry(6.12, 1.25, 0.42), material(0x647d79));
+            const header = new THREE.Mesh(new THREE.BoxGeometry(width + 0.02, 1.25, 0.42), material(0x647d79));
             header.position.y = 4.55;
             group.add(header);
             for (const side of [-1, 1]) {
                 const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 4.1, 0.2), material(0xaac7bf));
-                post.position.set(side * 3.03, 2.05, 0.04);
+                post.position.set(side * (width / 2 - 0.02), 2.05, 0.04);
                 group.add(post);
             }
+            group.add(gateStatIcon(definition.modifier));
             group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {...definition, kind: 'gate', pairId, x, z: -80, charge: 0, mesh, header, group, label: null};
+            const obj = {...definition, kind: 'gate', pairId, x, width, z: -80, charge: 0, mesh, header, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
@@ -503,14 +529,14 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         for (const obj of objects) {
             if (obj.kind === 'coin') continue;
             const hit = obj.kind === 'gate'
-                ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
+                ? Math.abs(bullet.x - obj.x) <= obj.width / 2 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
                 : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
             if (!hit) continue;
             burst(bullet.x, obj.kind === 'gate' ? 2 : 2.5, obj.z, 'impact');
             hitSound.hit('impact');
             if (obj.kind === 'gate') {
                 obj.charge++;
-                if (obj.charge >= 2) {
+                if (obj.charge >= (obj.single ? 1 : 2)) {
                     obj.charge = 0;
                     Object.assign(obj, improveGate(obj));
                     updateGate(obj);
@@ -527,7 +553,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 fill.material.color.setHex(fraction > 0.5 ? 0x65e59b : 0xffc16b);
                 if (obj.hp <= 0) {
                     burst(obj.x, 2.1, obj.z, 'break');
-                    hitSound.hit('break');
+                    hitSound.hit('cage');
                     collectDinosaur(obj.species, obj.level);
                     removeObject(obj);
                 }
@@ -583,7 +609,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             nextSpawn += 3.7;
         }
         if (remaining > 0 && elapsed >= nextGate) {
-            spawnGatePair(finishGoal.position.z);
+            spawnGates(finishGoal.position.z);
             nextGate += 9.8;
         }
         if (remaining > 0 && elapsed >= nextCoinWave) {
