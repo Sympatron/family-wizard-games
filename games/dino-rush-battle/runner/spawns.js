@@ -34,3 +34,7 @@ export function createRunnerWave(wave, stage, random = Math.random, preferredSpe
         };
     });
 }
+
+export function blockedByGate(z, gates, clearance = 30) {
+    return gates.some(gate => gate.kind === 'gate' && gate.z > z && gate.z - z < clearance);
+}
