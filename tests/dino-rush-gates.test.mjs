@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, createSingleGate, GATE_LANES, MAX_RUNNER_DAMAGE, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
+import {volleyPattern} from '../games/dino-rush-battle/runner/shots.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
     for (let stage = 1; stage <= 8; stage++) {
@@ -83,4 +84,23 @@ test('damage upgrades are exact additive and multiplicative values, including af
     assert.equal(applyGate({...base, damage: 2}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, 4);
     assert.equal(applyGate({...base, damage: 250}, {modifier: 'damage', operation: 'multiply', level: 4}).damage, MAX_RUNNER_DAMAGE);
     assert.equal(base.damage, 1);
+});
+
+test('gate labels match actual damage delivered by every individual bullet', () => {
+    let stats = {damage: 2, bullets: 3, fireRate: 1, pickupRange: 1.8};
+    const additive = {modifier: 'damage', operation: 'add', level: 4};
+    assert.equal(gateLabel(additive), 'SCHADEN +4');
+    stats = applyGate(stats, additive);
+    assert.equal(stats.damage, 6);
+    assert.deepEqual(volleyPattern(stats.bullets, stats.damage).map(shot => shot.damage), [6, 6, 6]);
+    const multiplier = {modifier: 'damage', operation: 'multiply', level: 4};
+    assert.equal(gateLabel(multiplier), 'SCHADEN ×2');
+    stats = applyGate(stats, multiplier);
+    assert.equal(stats.damage, 12);
+    const bullets = volleyPattern(stats.bullets, stats.damage);
+    assert.deepEqual(bullets.map(shot => shot.damage), [12, 12, 12]);
+    let cageHp = 36;
+    for (const bullet of bullets) cageHp -= bullet.damage;
+    assert.equal(cageHp, 0);
+    assert.equal(stats.bullets, 3);
 });
