@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate} from '../games/dino-rush-battle/runner/gates.js';
+import {createGatePair, applyGate, gateLabel, improveGate, selectCrossedGate, GATE_PROPERTIES} from '../games/dino-rush-battle/runner/gates.js';
 
 test('paired gates use different properties and offer both modifier types', () => {
     for (let stage = 1; stage <= 8; stage++) {
@@ -44,4 +44,16 @@ test('passing either side or the center of a gate pair reliably selects exactly 
     }
     assert.equal(selectCrossedGate(gates, 0, 6, 7, 8), null);
     assert.equal(selectCrossedGate(gates, 0, 9, 10, 8), null);
+});
+
+test('magnet gates appear in rotation and increase pickup range within safe bounds', () => {
+    const base = {damage: 1, fireRate: 1, bullets: 1, pickupRange: 1.8};
+    assert.ok(GATE_PROPERTIES.includes('pickupRange'));
+    assert.ok(Array.from({length: 8}, (_, index) => createGatePair(1, index)).flat().some(gate => gate.modifier === 'pickupRange'));
+    assert.equal(gateLabel({modifier: 'pickupRange', operation: 'add', level: 2}), 'MAGNET +2');
+    assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: 2}).pickupRange, 2.6);
+    assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'multiply', level: 4}).pickupRange, 3.6);
+    assert.equal(applyGate({...base, pickupRange: 4.4}, {modifier: 'pickupRange', operation: 'add', level: 4}).pickupRange, 4.5);
+    assert.equal(applyGate(base, {modifier: 'pickupRange', operation: 'add', level: -2}).pickupRange, 1);
+    assert.equal(base.pickupRange, 1.8);
 });
