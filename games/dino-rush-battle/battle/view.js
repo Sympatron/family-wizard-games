@@ -1,14 +1,19 @@
-import {SPECIES, maxHp} from '../core/game.js';
-import {BOARD_SIZE, toBattleScreen, battleCellCenter, battleCellAt} from '../core/board-layout.js';
+import {SPECIES, maxHp, getMergeChoices} from '../core/game.js';
+import {BOARD_SIZE, toCombatScreen, battleCellCenter, battleCellAt, reserveSidebar, reserveUnitPosition} from '../core/board-layout.js';
 import {createHitSound} from '../core/hit-sound.js';
+import {battlefieldCover} from './background-layout.js';
 
 const Phaser = window.Phaser;
+export const MASTERY_APPEARANCE = Object.freeze([
+    {width: 60, height: 48, halo: 0x285c4e, border: 0x83e7b4, label: '#b8f6d5'},
+    {width: 68, height: 55, halo: 0x264c85, border: 0x75bfff, label: '#a5d8ff'},
+    {width: 77, height: 63, halo: 0x684276, border: 0xffd071, label: '#ffe3a1'}
+]);
 export class BattleView {
-    constructor(host, {onCell, onSelect, onDrop}) {
+    constructor(host, {onSelect, onDrop}) {
         if (!Phaser) throw new Error('Die 2D-Spielengine konnte nicht geladen werden.');
         this.host = host;
         this.portrait = host.clientWidth < 620;
-        this.onCell = onCell;
         this.onSelect = onSelect;
         this.onDrop = onDrop;
         this.army = [];
@@ -45,6 +50,7 @@ export class BattleView {
     }
 
     preload(scene) {
+        scene.load.image('dino-battlefield', './assets/battlefield.png');
         for (const species of Object.keys(SPECIES)) {
             scene.load.svg('dino-' + species, './assets/dinos/' + species + '.svg', {width: 160, height: 128});
         }
@@ -54,31 +60,38 @@ export class BattleView {
         if (this.destroyed) return;
         this.scene = scene;
         const width = this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width;
-        const background = scene.add.graphics();
-        background.fillStyle(0x213a44, 1);
-        background.fillRoundedRect(this.portrait ? 14 : 250, 328, this.portrait ? 512 : 460, 174, 15);
-        background.fillStyle(0x47373f, 1);
-        background.fillRoundedRect(this.portrait ? 14 : 250, 42, this.portrait ? 512 : 460, 174, 15);
-        const grid = scene.add.graphics();
+        const sidebar = reserveSidebar(this.portrait);
+        const fieldCenter = sidebar.left / 2;
+        this.battlefield = scene.add.image(width / 2, 310, 'dino-battlefield').setDepth(-10);
+        this.battlefield.setScale(battlefieldCover(this.battlefield.width, this.battlefield.height, width, 620).scale);
+        this.planningBackground = scene.add.image(fieldCenter, 310, 'dino-battlefield').setDepth(-9);
+        this.planningBackground.setScale(battlefieldCover(this.planningBackground.width, this.planningBackground.height, sidebar.left, 620).scale);
+        this.planningMask = scene.make.graphics({x: 0, y: 0, add: false});
+        this.planningMask.fillStyle(0xffffff).fillRect(0, 0, sidebar.left, 620);
+        this.planningBackground.setMask(this.planningMask.createGeometryMask());
+        const background = scene.add.graphics().setDepth(-4);
+        background.fillStyle(0x142c23, 0.17);
+        background.fillRect(0, 0, sidebar.left, 620);
+        const grid = scene.add.graphics().setDepth(-3);
         for (const team of ['player', 'enemy']) {
             for (let cell = 0; cell < 15; cell++) {
                 const {x, y} = this.cellCenter(team, cell);
-                grid.lineStyle(1.5, team === 'player' ? 0x8cb6b0 : 0xc6a7a2, 0.75);
-                grid.fillStyle(team === 'player' ? 0x325a58 : 0x62494b, 0.75);
+                grid.lineStyle(1.5, team === 'player' ? 0x8cb6b0 : 0xc6a7a2, 0.85);
+                grid.fillStyle(team === 'player' ? 0x325a58 : 0x62494b, 0.82);
                 grid.fillRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
                 grid.strokeRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
             }
         }
-        scene.add.text(width / 2, 316, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', color: '#b4e4c4'}).setOrigin(0.5);
-        scene.add.text(width / 2, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', color: '#ffc49b'}).setOrigin(0.5);
-        this.hint = scene.add.text(width / 2, 270, '', {fontFamily: 'system-ui', fontSize: '19px', color: '#b4d6d9'}).setOrigin(0.5);
-        this.reserveBackground = scene.add.rectangle(width / 2, 561, width - 16, 115, 0x223c48, 0.95);
-        this.reserveTitle = scene.add.text(width / 2, 522, '', {fontFamily: 'system-ui', fontSize: '19px', color: '#d7e5f5'}).setOrigin(0.5);
+        this.formationLayers = [background, grid,
+            scene.add.text(fieldCenter, 540, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#b4e4c4'}).setOrigin(0.5).setDepth(4),
+            scene.add.text(fieldCenter, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#ffc49b'}).setOrigin(0.5).setDepth(4)];
+        this.reserveBackground = scene.add.rectangle(sidebar.center, 310, sidebar.width, 620, 0x142a36, 1).setDepth(-2);
+        this.reserveTitle = scene.add.text(sidebar.center, 25, '', {fontFamily: 'system-ui', fontSize: this.portrait ? '13px' : '17px', fontStyle: 'bold', color: '#d7e5f5'}).setOrigin(0.5).setDepth(3);
         this.reserveButtons = [-1, 1].map(direction => {
-            const x = direction === -1 ? 36 : width - 36;
-            const backing = scene.add.rectangle(x, 568, 66, 82, 0x42677a, 0.96).setDepth(2);
-            const arrow = scene.add.text(x, 565, direction === -1 ? '‹' : '›',
-                {fontFamily: 'system-ui', fontSize: '58px', color: '#f0ca7c'}).setOrigin(0.5).setDepth(3);
+            const x = sidebar.center + direction * (this.portrait ? 28 : 42);
+            const backing = scene.add.rectangle(x, 588, this.portrait ? 46 : 64, 46, 0x42677a, 0.96).setDepth(2);
+            const arrow = scene.add.text(x, 585, direction === -1 ? '‹' : '›',
+                {fontFamily: 'system-ui', fontSize: '35px', color: '#f0ca7c'}).setOrigin(0.5).setDepth(3);
             return {backing, arrow};
         });
         this.dropMarker = scene.add.graphics().setDepth(5);
@@ -94,10 +107,10 @@ export class BattleView {
         this.render();
     }
 
-    toScreen(x, y) { return toBattleScreen(x, y, this.portrait); }
+    toScreen(x, y) { return toCombatScreen(x, y, this.portrait); }
     cellCenter(team, cell) { return battleCellCenter(team, cell, this.portrait); }
     cellAt(x, y) { return battleCellAt(x, y, this.portrait); }
-    get reservePageSize() { return this.portrait ? 7 : 13; }
+    get reservePageSize() { return 6; }
     get width() { return this.portrait ? BOARD_SIZE.portrait.width : BOARD_SIZE.landscape.width; }
 
     pointAtClient(clientX, clientY) {
@@ -115,9 +128,8 @@ export class BattleView {
     reserveUnits() {
         const from = this.reservePage * this.reservePageSize;
         const visible = this.inventory.slice(from, from + this.reservePageSize);
-        const firstX = (this.width - (visible.length - 1) * 59) / 2;
         return visible.map((unit, index) => ({
-            id: unit.id, team: 'reserve', species: unit.species, level: unit.level, x: firstX + index * 59, y: 568,
+            id: unit.id, team: 'reserve', species: unit.species, level: unit.level, ...reserveUnitPosition(index, this.portrait),
             hp: unit.hp, maxHp: maxHp(unit, this.upgrades)
         }));
     }
@@ -129,14 +141,14 @@ export class BattleView {
     }
 
     unitAtPoint(x, y, excludeId = null) {
-        const units = y >= 525 ? this.reserveUnits() : this.army.map(unit => ({
+        const units = x >= reserveSidebar(this.portrait).left ? this.reserveUnits() : this.army.map(unit => ({
             id: unit.id, ...this.cellCenter('player', unit.cell)
         }));
         return units.find(unit => unit.id !== excludeId && Math.hypot(unit.x - x, unit.y - y) <= 29)?.id ?? null;
     }
 
     targetAtPoint(x, y, excludeId = null) {
-        if (y >= 527 && y <= 618 && x >= 0 && x <= this.width) {
+        if (x >= reserveSidebar(this.portrait).left && y >= 55 && y <= 559) {
             const unitId = this.unitAtPoint(x, y, excludeId);
             return unitId ? {unitId, reserve: true} : {reserve: true};
         }
@@ -156,7 +168,10 @@ export class BattleView {
         this.dropMarker.clear();
         if (!target || this.mode !== 'formation') return;
         this.dropMarker.lineStyle(4, 0xffe59b, 1);
-        if (target.reserve) this.dropMarker.strokeRoundedRect(7, 508, this.width - 14, 108, 12);
+        if (target.reserve) {
+            const sidebar = reserveSidebar(this.portrait);
+            this.dropMarker.strokeRoundedRect(sidebar.left + 4, 54, sidebar.width - 8, 504, 12);
+        }
         else if (Number.isInteger(target.cell)) {
             const {x, y} = this.cellCenter('player', target.cell);
             this.dropMarker.strokeRoundedRect(x - (this.portrait ? 41 : 40), y - 24, this.portrait ? 82 : 80, 48, 8);
@@ -167,18 +182,35 @@ export class BattleView {
         this.showDropTarget(this.targetAtClient(clientX, clientY, excludeId));
     }
 
+    updateDragCompatibility() {
+        if (this.mode !== 'formation') return;
+        const pool = [...this.army, ...this.inventory];
+        const source = this.mode === 'formation' && this.drag?.id ? pool.find(unit => unit.id === this.drag.id) : null;
+        for (const [key, entry] of this.units) {
+            const [team, id] = key.split(':');
+            const unit = (team === 'enemy' ? this.enemies : pool).find(candidate => candidate.id === id);
+            const incompatible = source && (team === 'enemy' || (id !== source.id && getMergeChoices(source, unit).length === 0));
+            entry.container.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
+            if (source || entry.dragDimmed) entry.sprite?.setTint(incompatible ? 0x777777 : 0xffffff);
+            entry.dragDimmed = !!incompatible;
+            entry.mastery?.setAlpha(incompatible ? 0.28 : unit?.hp > 0 ? 1 : 0.4);
+        }
+    }
+
     handlePointerDown(event) {
         this.hitSound?.unlock();
         if (this.mode !== 'formation' || (event.pointerType === 'mouse' && event.button !== 0)) return;
         const point = this.pointAtClient(event.clientX, event.clientY);
         if (!point) return;
-        if (point.y >= 535 && point.y <= 610 && (point.x <= 70 || point.x >= this.width - 70)) {
-            this.changeReservePage(point.x <= 70 ? -1 : 1);
+        const sidebar = reserveSidebar(this.portrait);
+        if (point.x >= sidebar.left && point.y >= 562 && point.y <= 620) {
+            this.changeReservePage(point.x < sidebar.center ? -1 : 1);
             event.preventDefault();
             return;
         }
         const id = this.unitAtPoint(point.x, point.y);
         this.drag = {id, pointerId: event.pointerId, start: point, moved: false};
+        if (id) this.updateDragCompatibility();
         this.canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
     }
@@ -193,6 +225,7 @@ export class BattleView {
         }
         if (!drag.moved && Math.hypot(point.x - drag.start.x, point.y - drag.start.y) < 9) return;
         drag.moved = true;
+        if (drag.id) this.updateDragCompatibility();
         if (drag.id) {
             const unit = this.units.get('player:' + drag.id) ?? this.units.get('reserve:' + drag.id);
             if (unit) {
@@ -208,6 +241,7 @@ export class BattleView {
         const drag = this.drag;
         if (!drag || drag.pointerId !== event.pointerId) return;
         this.drag = null;
+        this.updateDragCompatibility();
         if (this.canvas.hasPointerCapture?.(event.pointerId)) this.canvas.releasePointerCapture(event.pointerId);
         const unit = this.units.get('player:' + drag.id) ?? this.units.get('reserve:' + drag.id);
         if (unit) unit.container.setPosition(unit.targetX, unit.targetY).setDepth(1);
@@ -215,11 +249,6 @@ export class BattleView {
         if (cancelled || this.mode !== 'formation') return;
         if (!drag.moved) {
             if (drag.id) this.onSelect(drag.id);
-            else {
-                const point = this.pointAtClient(event.clientX, event.clientY);
-                const cell = point ? this.cellAt(point.x, point.y) : null;
-                if (cell !== null) this.onCell(cell);
-            }
             return;
         }
         if (drag.id) {
@@ -237,6 +266,7 @@ export class BattleView {
         this.upgrades = upgrades;
         this.mode = 'formation';
         this.playback = null;
+        this.drag = null;
         this.showDropTarget(null);
         this.render();
     }
@@ -246,6 +276,7 @@ export class BattleView {
         this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
         this.lastShotFrame = -1;
         this.mode = 'battle';
+        this.drag = null;
         this.playback = {frames, index: 0, elapsed: 0, complete};
         this.render();
     }
@@ -272,6 +303,7 @@ export class BattleView {
                 entry.container.y += (entry.targetY - entry.container.y) * blend;
             }
         }
+        for (const entry of this.units.values()) entry.mastery?.setPosition(entry.container.x, entry.container.y - 43);
     }
 
     formationUnits() {
@@ -328,17 +360,22 @@ export class BattleView {
     createUnit(unit) {
         const scene = this.scene;
         const container = scene.add.container(unit.x, unit.y).setDepth(1);
-        const shadow = scene.add.ellipse(0, 18, 46, 18, 0x101c23, 0.5);
-        const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(67, 54);
-        const selection = scene.add.ellipse(0, -7, 72, 58, 0xffef8a, 0).setStrokeStyle(0, 0xffef8a);
-        const mastery = scene.add.text(0, -37, 'R' + SPECIES[unit.species].rank + ' · T' + (unit.level ?? 1), {
-            fontFamily: 'system-ui', fontSize: '11px', fontStyle: 'bold',
-            color: unit.team === 'enemy' ? '#ffcbaa' : '#d6f3d7'
-        }).setOrigin(0.5);
+        const tier = Math.max(1, Math.min(3, unit.level ?? 1));
+        const appearance = MASTERY_APPEARANCE[tier - 1];
+        const shadow = scene.add.ellipse(0, 18, appearance.width * 0.76, 18, 0x101c23, 0.5);
+        const aura = scene.add.ellipse(0, -8, appearance.width + 7, appearance.height + 7, appearance.halo, 0.55)
+            .setStrokeStyle(3, appearance.border, 0.95);
+        const sprite = scene.add.image(0, -8, 'dino-' + unit.species).setDisplaySize(appearance.width, appearance.height);
+        const selection = scene.add.ellipse(0, -8, appearance.width + 15, appearance.height + 15, 0xffef8a, 0)
+            .setStrokeStyle(0, 0xffef8a);
+        const mastery = scene.add.text(unit.x, unit.y - 43, 'R' + SPECIES[unit.species].rank + ' · T' + tier, {
+            fontFamily: 'system-ui', fontSize: '13px', fontStyle: 'bold', color: appearance.label,
+            stroke: '#10202b', strokeThickness: 3
+        }).setOrigin(0.5).setDepth(12);
         const healthBack = scene.add.rectangle(-24, 26, 48, 6, 0x15212b).setOrigin(0, 0.5);
         const health = scene.add.rectangle(-24, 26, 48, 6, 0x91ebb3).setOrigin(0, 0.5);
-        container.add([shadow, selection, sprite, mastery, healthBack, health]);
-        const result = {container, sprite, selection, health, targetX: unit.x, targetY: unit.y, team: unit.team};
+        container.add([shadow, aura, selection, sprite, healthBack, health]);
+        const result = {container, sprite, aura, selection, mastery, health, targetX: unit.x, targetY: unit.y, team: unit.team};
         this.units.set(unit.team + ':' + unit.id, result);
         return result;
     }
@@ -347,16 +384,18 @@ export class BattleView {
         if (!this.scene || this.destroyed) return;
         const frame = this.mode === 'formation' ? this.formationUnits() : this.playback?.frames[this.playback.index] ?? [];
         const isFormation = this.mode === 'formation';
+        this.battlefield?.setVisible(!isFormation);
+        this.planningBackground?.setVisible(isFormation);
         if (!isFormation && this.playback && this.playback.index !== this.lastShotFrame) {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
         }
-        this.hint.setText(isFormation ? 'Dino wählen oder ziehen' : 'KAMPF LÄUFT ...');
+        for (const layer of this.formationLayers) layer.setVisible(isFormation);
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
         }
         const pageCount = Math.max(1, Math.ceil(this.inventory.length / this.reservePageSize));
-        this.reserveTitle.setText('VORRAT (' + this.inventory.length + ') · ' + (this.reservePage + 1) + '/' + pageCount);
+        this.reserveTitle.setText('VORRAT ' + this.inventory.length + ' · ' + (this.reservePage + 1) + '/' + pageCount);
         this.reserveButtons[0].backing.setVisible(isFormation && this.reservePage > 0);
         this.reserveButtons[0].arrow.setVisible(isFormation && this.reservePage > 0);
         this.reserveButtons[1].backing.setVisible(isFormation && this.reservePage < pageCount - 1);
@@ -375,16 +414,23 @@ export class BattleView {
             entry.targetX = unit.x;
             entry.targetY = unit.y;
             if (isFormation && this.drag?.id !== unit.id) entry.container.setPosition(unit.x, unit.y);
+            entry.mastery.setPosition(entry.container.x, entry.container.y - 43);
+            entry.mastery.setVisible(unit.hp > 0 || isFormation);
             entry.container.setVisible(unit.hp > 0 || isFormation);
             entry.container.setAlpha(unit.hp > 0 ? 1 : 0.4);
+            entry.mastery.setAlpha(unit.hp > 0 ? 1 : 0.4);
             entry.sprite.setTint(unit.stunned ? 0xf0d37d : 0xffffff);
             const chosen = unit.id === this.selected && isFormation;
+            entry.aura.setVisible(isFormation);
+            entry.selection.setVisible(isFormation);
             entry.selection.setStrokeStyle(chosen ? 4 : 0, 0xffef8a);
             entry.health.displayWidth = 48 * Math.max(0, Math.min(1, unit.hp / Math.max(1, unit.maxHp)));
         }
+        this.updateDragCompatibility();
         for (const [key, entry] of this.units) {
             if (!visible.has(key)) {
                 entry.container.destroy();
+                entry.mastery.destroy();
                 this.units.delete(key);
             }
         }
@@ -395,6 +441,7 @@ export class BattleView {
         this.destroyed = true;
         this.playback = null;
         this.hitSound?.dispose();
+        this.planningMask?.destroy();
         if (this.canvas) {
             this.canvas.removeEventListener('pointerdown', this.pointerDown);
             this.canvas.removeEventListener('pointermove', this.pointerMove);

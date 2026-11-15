@@ -3,16 +3,17 @@ import assert from 'node:assert/strict';
 import {createRunnerWave, cageHitPoints, RUNNER_SPECIES, ADVANCED_SPECIES} from '../games/dino-rush-battle/runner/spawns.js';
 import {volleyPattern, initialRunnerWeaponStats} from '../games/dino-rush-battle/runner/shots.js';
 
-test('shots split total damage evenly and fan outward', () => {
+test('every projectile deals the full absolute damage and shots fan outward', () => {
     for (const bullets of [1, 2, 3, 4, 5]) {
         const shots = volleyPattern(bullets, 4);
         assert.equal(shots.length, bullets);
-        assert.ok(Math.abs(shots.reduce((sum, shot) => sum + shot.damage, 0) - 4) < 1e-10);
+        assert.ok(shots.every(shot => shot.damage === 4));
         assert.ok(Math.abs(shots[0].spread + shots.at(-1).spread) < 1e-12);
         assert.ok(Math.abs(shots[0].offset + shots.at(-1).offset) < 1e-12);
         if (bullets > 1) assert.ok(shots[0].spread < 0 && shots.at(-1).spread > 0);
     }
-    assert.deepEqual(volleyPattern(4, 4).map(shot => shot.damage), [1, 1, 1, 1]);
+    assert.deepEqual(volleyPattern(4, 4).map(shot => shot.damage), [4, 4, 4, 4]);
+    assert.deepEqual(volleyPattern(5, 2).map(shot => shot.damage), [2, 2, 2, 2, 2]);
     assert.throws(() => volleyPattern(0, 4));
     assert.throws(() => volleyPattern(6, 4));
 });
@@ -32,7 +33,7 @@ test('runner averages nine common cage encounters per early stage, with rare rew
 });
 
 test('permanent runner damage upgrades cannot bypass the weapon balance cap', () => {
-    assert.deepEqual(initialRunnerWeaponStats(), {damage: 1, fireRate: 1, bullets: 1});
+    assert.deepEqual(initialRunnerWeaponStats(), {damage: 1, fireRate: 1, bullets: 1, pickupRange: 1.8});
     assert.equal(initialRunnerWeaponStats({runnerDamage: 9999}).damage, 3);
     assert.equal(initialRunnerWeaponStats({runnerDamage: -10}).damage, 1);
     assert.equal(initialRunnerWeaponStats({runnerDamage: 1}).damage, 1.12);

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRunnerWave, TRACK_HALF_WIDTH, RUNNER_SPECIES} from '../games/dino-rush-battle/runner/spawns.js';
+import {createRunnerWave, TRACK_HALF_WIDTH, RUNNER_SPECIES, blockedByGate} from '../games/dino-rush-battle/runner/spawns.js';
 
 test('runner spawns only caged dinosaurs at arbitrary horizontal positions', () => {
     let seed = 439;
@@ -25,4 +25,14 @@ test('runner spawn distributions are not determined by stage and wave alone', ()
     const two = createRunnerWave(1, 3, () => 0.9);
     assert.notDeepEqual(one, two);
     assert.throws(() => createRunnerWave(-1, 1));
+});
+
+test('no objects spawn directly behind an active gate, including coins and cages', () => {
+    const gates = [{kind: 'gate', z: -50, x: -3.2}, {kind: 'gate', z: -50, x: 3.2}];
+    for (const z of [-51, -60, -79.9]) assert.equal(blockedByGate(z, gates), true);
+    assert.equal(blockedByGate(-80, gates), false);
+    assert.equal(blockedByGate(-40, gates), false);
+    assert.equal(blockedByGate(-50, gates), false);
+    assert.equal(blockedByGate(-70, [{kind: 'coin', z: -50}]), false);
+    assert.equal(blockedByGate(-70, []), false);
 });

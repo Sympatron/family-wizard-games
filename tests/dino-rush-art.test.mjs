@@ -23,7 +23,9 @@ test('every combat dinosaur has unique illustrated SVG artwork', async () => {
 test('Phaser preloads matching dinosaur SVG textures', () => {
     const loaded = [];
     const view = Object.create(BattleView.prototype);
-    view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config})}});
+    const backgrounds = [];
+    view.preload({load: {svg: (key, url, config) => loaded.push({key, url, config}), image: (key, url) => backgrounds.push({key, url})}});
+    assert.deepEqual(backgrounds, [{key: 'dino-battlefield', url: './assets/battlefield.png'}]);
     assert.equal(loaded.length, Object.keys(SPECIES).length);
     for (const species of Object.keys(SPECIES)) {
         assert.deepEqual(loaded.find(item => item.key === 'dino-' + species), {
@@ -31,3 +33,4 @@ test('Phaser preloads matching dinosaur SVG textures', () => {
         });
     }
 });
+

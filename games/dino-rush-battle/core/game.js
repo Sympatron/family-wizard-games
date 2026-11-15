@@ -1,23 +1,34 @@
 import {SPECIES, MAX_TIER} from './species.js';
+import {BASE_PICKUP_RANGE} from '../runner/coins.js';
+import {initialRunnerWeaponStats} from '../runner/shots.js';
+import {GUN_UPGRADES, gunUpgradeCost, healingCost} from './shop.js';
+
 export {SPECIES} from './species.js';
 export function migrateGame(game) {
-    if (!game || game.version >= 2) return game;
+    if (!game || game.version >= 3) return game;
     const result = structuredClone(game);
-    result.version = 2;
-    for (const unit of [...(result.run?.army ?? []), ...(result.run?.inventory ?? [])]) {
-        const rank = SPECIES[unit.species]?.rank ?? 1;
-        const oldLevel = unit.level ?? 1;
-        const oldMaximum = SPECIES[unit.species].hp * (1 + (oldLevel - 1) * 0.2) *
-            (1 + (result.meta?.upgrades?.starterHp ?? 0) * 0.08);
-        unit.level = Math.max(1, Math.min(MAX_TIER, oldLevel - (rank > 1 ? 1 : 0)));
-        unit.hp = Math.max(0, Math.min(maxHp(unit, result.meta?.upgrades),
-            Math.round(unit.hp / Math.max(1, oldMaximum) * maxHp(unit, result.meta?.upgrades))));
+    if ((result.version ?? 1) < 2) {
+        for (const unit of [...(result.run?.army ?? []), ...(result.run?.inventory ?? [])]) {
+            const rank = SPECIES[unit.species]?.rank ?? 1;
+            const oldLevel = unit.level ?? 1;
+            const oldMaximum = SPECIES[unit.species].hp * (1 + (oldLevel - 1) * 0.2) *
+                (1 + (result.meta?.upgrades?.starterHp ?? 0) * 0.08);
+            unit.level = Math.max(1, Math.min(MAX_TIER, oldLevel - (rank > 1 ? 1 : 0)));
+            unit.hp = Math.max(0, Math.min(maxHp(unit, result.meta?.upgrades),
+                Math.round(unit.hp / Math.max(1, oldMaximum) * maxHp(unit, result.meta?.upgrades))));
+        }
     }
+    if (result.run) {
+        result.run.gunUpgrades ??= {damage: 0, fireRate: 0, bullets: 0};
+        result.run.money += Math.max(0, result.run.potions ?? 0) * 20;
+        delete result.run.potions;
+    }
+    result.version = 3;
     return result;
 }
 
 export const INITIAL_GAME = {
-    version: 2,
+    version: 3,
     meta: {currency: 0, upgrades: {starterHp: 0, runnerDamage: 0}},
     run: createRun()
 };
@@ -30,9 +41,9 @@ export function maxHp(unit, upgrades = {}) {
 }
 export function createRun() {
     return {
-        phase: 'runner', stage: 1, money: 0, potions: 0, nextId: 2,
+        phase: 'runner', stage: 1, money: 0, nextId: 2,
         army: [{id: 'd1', species: 'raptor', level: 1, hp: 70, cell: 0}],
-        inventory: [], temporary: {damage: 1, fireRate: 1, bullets: 1}, battleUpgrades: {damage: 0}, lastResult: null
+        inventory: [], temporary: initialRunnerWeaponStats(), gunUpgrades: {damage: 0, fireRate: 0, bullets: 0}, battleUpgrades: {damage: 0}, lastResult: null
     };
 }
 export function getEnemies(stage) {
@@ -105,9 +116,10 @@ export function reduceGame(game, action) {
             }
             const temporary = action.payload?.temporary ?? {};
             run.temporary = {
-                damage: Math.max(0.25, Math.min(3, Number(temporary.damage) || 1)),
-                fireRate: Math.max(0.25, Math.min(2.5, Number(temporary.fireRate) || 1)),
-                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1)))
+                damage: Math.max(0.25, Number(temporary.damage) || 1),
+                fireRate: Math.max(0.25, Number(temporary.fireRate) || 1),
+                bullets: Math.max(1, Math.min(5, Math.floor(Number(temporary.bullets) || 1))),
+                pickupRange: Math.max(1, Number(temporary.pickupRange) || BASE_PICKUP_RANGE)
             };
             const coins = action.payload?.coins ?? 0;
             if (!Number.isSafeInteger(coins) || coins < 0 || coins > 3000) fail('Ungültige Münzen.');
@@ -212,24 +224,35 @@ export function reduceGame(game, action) {
             run.battleUpgrades.damage++;
             return {game: next, message: 'Dein Team verursacht jetzt mehr Schaden.'};
         }
-        case 'buy-potion':
-            if (run.phase !== 'rewards' || run.money < 20) fail('Nicht genug Geld.');
-            run.money -= 20;
-            run.potions++;
-            return {game: next, message: 'Heiltrank gekauft.'};
+        case 'buy-gun-upgrade': {
+            if (run.phase !== 'rewards') fail('Waffenupgrades sind nur zwischen Kämpfen möglich.');
+            const kind = action.payload?.kind;
+            if (!Object.hasOwn(GUN_UPGRADES, kind)) fail('Unbekanntes Waffenupgrade.');
+            const level = run.gunUpgrades[kind];
+            if (GUN_UPGRADES[kind].maxLevel !== undefined && level >= GUN_UPGRADES[kind].maxLevel) fail('Waffe bereits maximal verbessert.');
+            const cost = gunUpgradeCost(kind, level);
+            if (run.money < cost) fail('Nicht genug Geld.');
+            run.money -= cost;
+            run.gunUpgrades[kind]++;
+            return {game: next, message: 'Waffe verbessert: ' + GUN_UPGRADES[kind].label + '.'};
+        }
         case 'heal': {
-            if (run.phase !== 'rewards' || run.potions < 1) fail('Kein Heiltrank verfügbar.');
+            if (run.phase !== 'rewards') fail('Heilung ist nur zwischen Kämpfen möglich.');
             const unit = [...run.army, ...run.inventory].find(item => item.id === action.payload?.id);
-            if (!unit || unit.hp >= maxHp(unit, next.meta.upgrades)) fail('Dieser Dinosaurier braucht keine Heilung.');
-            unit.hp = Math.min(maxHp(unit, next.meta.upgrades), unit.hp + Math.max(1, Math.ceil(maxHp(unit, next.meta.upgrades) * 0.6)));
-            run.potions--;
-            return {game: next, message: 'Dinosaurier geheilt.'};
+            if (!unit) fail('Dinosaurier nicht gefunden.');
+            const maximum = maxHp(unit, next.meta.upgrades);
+            if (unit.hp >= maximum) fail('Dieser Dinosaurier braucht keine Heilung.');
+            const cost = healingCost(unit.hp, maximum);
+            if (run.money < cost) fail('Nicht genug Geld.');
+            run.money -= cost;
+            unit.hp = maximum;
+            return {game: next, message: SPECIES[unit.species].name + ' vollständig geheilt für ' + cost + ' Münzen.'};
         }
         case 'next-stage':
             if (run.phase !== 'rewards') fail('Schließe zuerst den Kampf ab.');
             run.stage++;
             run.phase = 'runner';
-            run.temporary = {damage: 1, fireRate: 1, bullets: 1};
+            run.temporary = initialRunnerWeaponStats(next.meta.upgrades, run.gunUpgrades);
             return {game: next};
         case 'upgrade': {
             if (run.phase !== 'gameover') fail('Dauerhafte Upgrades sind zwischen den Läufen verfügbar.');

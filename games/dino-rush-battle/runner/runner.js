@@ -5,23 +5,25 @@ try {
     THREE = await import('https://unpkg.com/three@0.187.0/build/three.module.js');
 }
 import {SPECIES as DINOSAURS} from '../core/game.js';
-import {createGatePair, gateLabel, improveGate, applyGate, selectCrossedGate} from './gates.js';
+import {createGatePair, createSingleGate, gateLabel, improveGate, applyGate, selectCrossedGate, GATE_LANES, GATE_WIDTH} from './gates.js';
+import {paintRunnerStatIcon} from './hud.js';
 import {createRanger} from './ranger.js';
 import {runnerCameraSettings} from './camera.js';
-import {createRunnerWave} from './spawns.js';
+import {createRunnerWave, blockedByGate} from './spawns.js';
 import {bulletHitsCage} from './collision.js';
 import {finishLinePosition, canSpawnBeforeGoal} from './goal.js';
 import {createHitSound} from '../core/hit-sound.js';
 import {createRunnerNotice} from './notices.js';
 import {makeCoinWave, crossedCoin} from './coins.js';
+import {COIN_ATTRACT_SECONDS, COIN_COUNTER_SECONDS, interpolateCoinFlight} from './coin-flight.js';
 import {createRunnerClock} from './clock.js';
 import {cageBarLayout} from './cage-layout.js';
-import {volleyPattern, initialRunnerWeaponStats} from './shots.js';
+import {volleyPattern, initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS} from './shots.js';
 
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
+export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -30,6 +32,12 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.matchMedia('(pointer:coarse)').matches ? 1.5 : 2));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     host.replaceChildren(renderer.domElement);
+    const gateGuide = document.createElement('div');
+    gateGuide.className = 'dino-gate-guide';
+    gateGuide.hidden = true;
+    const gateChoices = [document.createElement('span'), document.createElement('span')];
+    gateGuide.append(...gateChoices);
+    host.append(gateGuide);
     scene.add(new THREE.HemisphereLight(0xd6f7ff, 0x354b39, 2.2));
     const sunlight = new THREE.DirectionalLight(0xffe6bd, 2.2);
     sunlight.position.set(-8, 18, 5);
@@ -160,28 +168,30 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     const bullets = [];
     const particles = [];
     const damageLabels = [];
+    const coinFlights = [];
     const hitSound = createHitSound();
     const notices = createRunnerNotice();
     const collected = [];
     const followers = [];
-    const followerOffsets = [-1.5, 1.5, -3.1, 0, 3.1];
+    const followerOffsets = [-1.8, 1.8, -3.6, 0, 3.6];
     function collectDinosaur(species, level = 1) {
         collected.push({species, level});
         notices.show(DINOSAURS[species].name + ' befreit!');
         if (followers.length >= 15) return;
         const follower = dinosaur(species, DINOSAURS[species].color);
-        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.62 : 0.56);
+        follower.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.83 : 0.77);
         follower.position.set(player.position.x, 0, 9.4);
         scene.add(follower);
         followers.push(follower);
     }
-    const temporary = initialRunnerWeaponStats(upgrades);
+    const temporary = initialRunnerWeaponStats(upgrades, gunUpgrades);
     let remaining = DURATION;
     let elapsed = 0;
     let playerHp = 3;
     let shots = 0;
     let kills = 0;
     let runnerCoins = 0;
+    let displayCoins = 0;
     let spawnCount = 0;
     let nextSpawn = 0.5;
     let nextCoinWave = 1.1;
@@ -197,15 +207,22 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     const keys = new Set();
     let hurtFlash = 0;
 
-    function gateText(text, y, width, height, fontSize, color) {
+    function gateText(text, y, width, height, fontSize, color, border = null) {
         const canvas = document.createElement('canvas');
         canvas.width = 1024;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
+        if (border) {
+            ctx.fillStyle = '#102631';
+            ctx.fillRect(12, 8, 1000, 240);
+            ctx.lineWidth = 10;
+            ctx.strokeStyle = border;
+            ctx.strokeRect(12, 8, 1000, 240);
+        }
         ctx.font = '900 ' + fontSize + 'px system-ui';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.lineWidth = 13;
+        ctx.lineWidth = 20;
         ctx.strokeStyle = '#17252b';
         ctx.strokeText(text, 512, 136, 970);
         ctx.fillStyle = color;
@@ -214,6 +231,27 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
         sprite.scale.set(width, height, 1);
         sprite.position.set(0, y, 0.35);
+        return sprite;
+    }
+    function gateStatIcon(modifier) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#19303b';
+        ctx.strokeStyle = '#f5d18b';
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(128, 128, 116, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(38, 38);
+        paintRunnerStatIcon(ctx, modifier, 180);
+        ctx.restore();
+        const texture = new THREE.CanvasTexture(canvas);
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, transparent: true}));
+        sprite.position.set(0, 6.3, 0.6);
+        sprite.scale.set(2, 2, 1);
         return sprite;
     }
     function updateGate(obj) {
@@ -230,33 +268,38 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         }
         const [type, value] = gateLabel(obj).split(' ');
         const label = new THREE.Group();
-        label.add(gateText(type, 4.55, 5.8, 0.8, 126, '#ffffff'));
-        label.add(gateText(value, 2.15, 5.75, 2.55, 210, '#fff3a0'));
+        const accent = positive ? '#8bffe0' : obj.level < 0 ? '#ff998c' : '#ffec96';
+        const labelWidth = (obj.width ?? GATE_WIDTH) - 0.2;
+        label.add(gateText(type, 4.55, labelWidth, 1.25, 172, '#ffffff', accent));
+        label.add(gateText(value, 2.1, labelWidth, 2.55, 225, '#fff4b6', accent));
         obj.label = label;
         obj.group.add(label);
     }
-    function spawnGatePair(goalZ) {
+    function spawnGates(goalZ) {
         if (!canSpawnBeforeGoal(-80, goalZ, 6)) return;
         const pairId = gateCount++;
-        for (const [index, definition] of createGatePair(stage, pairId).entries()) {
-            const x = index === 0 ? -3.2 : 3.2;
+        const definitions = pairId % 2 === 0 ? createGatePair(stage, pairId) : [createSingleGate(stage, pairId)];
+        for (const [index, definition] of definitions.entries()) {
+            const x = definition.x ?? GATE_LANES[index];
+            const width = definition.width ?? GATE_WIDTH;
             const group = new THREE.Group();
-            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(6.1, 4.1), new THREE.MeshBasicMaterial({
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, 4.1), new THREE.MeshBasicMaterial({
                 color: 0xffffff, transparent: true, opacity: 0.24, depthWrite: false, side: THREE.DoubleSide
             }));
             mesh.position.y = 2.05;
             group.add(mesh);
-            const header = new THREE.Mesh(new THREE.BoxGeometry(6.12, 0.95, 0.42), material(0x647d79));
+            const header = new THREE.Mesh(new THREE.BoxGeometry(width + 0.02, 1.25, 0.42), material(0x647d79));
             header.position.y = 4.55;
             group.add(header);
             for (const side of [-1, 1]) {
                 const post = new THREE.Mesh(new THREE.BoxGeometry(0.11, 4.1, 0.2), material(0xaac7bf));
-                post.position.set(side * 3.03, 2.05, 0.04);
+                post.position.set(side * (width / 2 - 0.02), 2.05, 0.04);
                 group.add(post);
             }
+            group.add(gateStatIcon(definition.modifier));
             group.position.set(x, 0, -80);
             scene.add(group);
-            const obj = {...definition, kind: 'gate', pairId, x, z: -80, charge: 0, mesh, header, group, label: null};
+            const obj = {...definition, kind: 'gate', pairId, x, width, z: -80, charge: 0, mesh, header, group, label: null};
             updateGate(obj);
             objects.push(obj);
         }
@@ -264,7 +307,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     function cage(species, rarity = 'common') {
         const group = new THREE.Group();
         const creature = dinosaur(species, DINOSAURS[species].color, true);
-        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.82 : 0.84);
+        creature.scale.setScalar(DINOSAURS[species].rank > 1 ? 0.98 : 1.02);
         creature.rotation.y = Math.PI;
         group.add(creature);
         const barLayout = cageBarLayout();
@@ -300,7 +343,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     }
     function spawnWave(goalZ) {
         for (const item of createRunnerWave(spawnCount++, stage, Math.random, roster)) {
-            if (!canSpawnBeforeGoal(item.z, goalZ, 5)) continue;
+            if (!canSpawnBeforeGoal(item.z, goalZ, 5) || blockedByGate(item.z, objects)) continue;
             const group = cage(item.species, item.rarity);
             group.position.set(item.x, 0, item.z);
             scene.add(group);
@@ -310,7 +353,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
     }
     function spawnCoinWave(goalZ) {
         for (const item of makeCoinWave()) {
-            if (!canSpawnBeforeGoal(item.z, goalZ, 3)) continue;
+            if (!canSpawnBeforeGoal(item.z, goalZ, 3) || blockedByGate(item.z, objects)) continue;
             const group = new THREE.Group();
             const metal = new THREE.MeshStandardMaterial({
                 color: item.value === 10 ? 0xffcd46 : item.value === 5 ? 0xc4e0ee : 0xc98b50,
@@ -329,10 +372,13 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         }
     }
     function floatDamage(x, y, z, amount) {
-        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 1.8, 0.85, 210, '#ffad93');
-        sprite.position.set(x, y, z);
+        if (amount <= 0) return;
+        const sprite = gateText('−' + Math.max(1, Math.round(amount)), 0, 3.8, 1.7, 220, '#ffcf9e');
+        sprite.material.depthTest = false;
+        sprite.renderOrder = 25;
+        sprite.position.set(x, y + 1.5, z + 5);
         scene.add(sprite);
-        damageLabels.push({sprite, remaining: 0.8});
+        damageLabels.push({sprite, remaining: 0.9});
     }
     function createFinishGoal() {
         const group = new THREE.Group();
@@ -380,6 +426,64 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         objects.splice(i, 1);
         disposeGroup(obj.group);
     }
+    function startCoinFlight(obj) {
+        const index = objects.indexOf(obj);
+        if (index < 0) return;
+        objects.splice(index, 1);
+        runnerCoins += obj.value;
+        hitSound.hit('coin');
+        notices.show('+' + obj.value + ' Münzen');
+        coinFlights.push({group: obj.group, value: obj.value, origin: obj.group.position.clone(), elapsed: 0, phase: 'attract'});
+    }
+    function projectCoinToHost(position) {
+        camera.updateMatrixWorld();
+        const projected = position.clone().project(camera);
+        const canvasRect = renderer.domElement.getBoundingClientRect();
+        const hostRect = host.getBoundingClientRect();
+        return {
+            x: canvasRect.left + (projected.x + 1) * canvasRect.width / 2 - hostRect.left,
+            y: canvasRect.top + (1 - projected.y) * canvasRect.height / 2 - hostRect.top
+        };
+    }
+    function animateCoinFlights(dt) {
+        for (let i = coinFlights.length - 1; i >= 0; i--) {
+            const flight = coinFlights[i];
+            flight.elapsed += dt;
+            if (flight.phase === 'attract') {
+                const destination = {x: player.position.x, y: 1.8, z: player.position.z};
+                const point = interpolateCoinFlight(flight.origin, destination, flight.elapsed, COIN_ATTRACT_SECONDS);
+                flight.group.position.set(point.x, point.y, point.z);
+                flight.group.rotation.y += dt * 10;
+                flight.group.scale.setScalar(1 - Math.min(1, flight.elapsed / COIN_ATTRACT_SECONDS) * 0.55);
+                if (flight.elapsed >= COIN_ATTRACT_SECONDS) {
+                    flight.phase = 'counter';
+                    flight.elapsed = 0;
+                    flight.origin = projectCoinToHost(flight.group.position);
+                }
+                continue;
+            }
+            const rect = document.querySelector('#runner-coin-counter')?.getBoundingClientRect();
+            const hostRect = host.getBoundingClientRect();
+            const destination = rect
+                ? {x: rect.left + rect.width / 2 - hostRect.left, y: rect.top + rect.height / 2 - hostRect.top}
+                : {x: host.clientWidth / 2, y: 25};
+            const point = interpolateCoinFlight(flight.origin, destination, flight.elapsed, COIN_COUNTER_SECONDS);
+            const progress = Math.min(1, flight.elapsed / COIN_COUNTER_SECONDS);
+            const canvasRect = renderer.domElement.getBoundingClientRect();
+            const x = (hostRect.left + point.x - canvasRect.left) / canvasRect.width * 2 - 1;
+            const y = 1 - (hostRect.top + point.y - canvasRect.top) / canvasRect.height * 2;
+            const world = new THREE.Vector3(x, y, 0.4).unproject(camera);
+            const worldPerPixel = 2 * world.distanceTo(camera.position) * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / canvasRect.height;
+            flight.group.position.copy(world);
+            flight.group.quaternion.copy(camera.quaternion);
+            flight.group.scale.setScalar(worldPerPixel * 28 / 1.28 * (1 - 0.3 * progress));
+            if (progress >= 1) {
+                disposeGroup(flight.group);
+                displayCoins += flight.value;
+                coinFlights.splice(i, 1);
+            }
+        }
+    }
     function shoot() {
         const volley = volleyPattern(Math.min(5, temporary.bullets), temporary.damage);
         for (const shot of volley) {
@@ -402,6 +506,17 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             particles.push({mesh, life: 0.35, vx: (Math.random() - 0.5) * 8, vy: 2 + Math.random() * 4, vz: (Math.random() - 0.5) * 6});
         }
     }
+    function updateGateGuide() {
+        const next = objects.filter(obj => obj.kind === 'gate' && obj.z < player.position.z - 3)
+            .sort((a, b) => b.z - a.z)[0];
+        const pair = next ? objects.filter(obj => obj.kind === 'gate' && obj.pairId === next.pairId)
+            .sort((a, b) => a.x - b.x) : [];
+        gateGuide.hidden = pair.length !== 2;
+        for (const [index, gate] of pair.entries()) {
+            gateChoices[index].textContent = (index === 0 ? 'LINKS · ' : 'RECHTS · ') + gateLabel(gate);
+            gateChoices[index].className = gate.level > 0 ? 'positive' : gate.level < 0 ? 'negative' : 'neutral';
+        }
+    }
     function collectGate(obj) {
         const previous = temporary[obj.modifier];
         Object.assign(temporary, applyGate(temporary, obj));
@@ -414,14 +529,14 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         for (const obj of objects) {
             if (obj.kind === 'coin') continue;
             const hit = obj.kind === 'gate'
-                ? Math.abs(bullet.x - obj.x) <= 3.05 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
+                ? Math.abs(bullet.x - obj.x) <= obj.width / 2 && bullet.z <= obj.z + 0.35 && previousZ >= obj.z - 0.35
                 : bulletHitsCage(bullet.x, previousZ, bullet.z, obj.x, obj.z);
             if (!hit) continue;
             burst(bullet.x, obj.kind === 'gate' ? 2 : 2.5, obj.z, 'impact');
             hitSound.hit('impact');
             if (obj.kind === 'gate') {
                 obj.charge++;
-                if (obj.charge >= 2) {
+                if (obj.charge >= (obj.single ? 1 : 2)) {
                     obj.charge = 0;
                     Object.assign(obj, improveGate(obj));
                     updateGate(obj);
@@ -438,7 +553,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 fill.material.color.setHex(fraction > 0.5 ? 0x65e59b : 0xffc16b);
                 if (obj.hp <= 0) {
                     burst(obj.x, 2.1, obj.z, 'break');
-                    hitSound.hit('break');
+                    hitSound.hit('cage');
                     collectDinosaur(obj.species, obj.level);
                     removeObject(obj);
                 }
@@ -483,9 +598,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         camera.position.x = THREE.MathUtils.damp(camera.position.x, player.position.x * 0.25, 2.5, dt);
         camera.lookAt(camera.position.x * 0.4, 1.5, -20);
         shotTimer -= dt;
-        if (shotTimer <= 0) {
+        while (shotTimer <= 0) {
             shoot();
-            shotTimer += 0.28 / temporary.fireRate;
+            shotTimer += SHOT_INTERVAL_SECONDS / temporary.fireRate;
         }
         const speed = 17 + Math.min(stage, 12) * 0.6;
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
@@ -494,7 +609,7 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             nextSpawn += 3.7;
         }
         if (remaining > 0 && elapsed >= nextGate) {
-            spawnGatePair(finishGoal.position.z);
+            spawnGates(finishGoal.position.z);
             nextGate += 9.8;
         }
         if (remaining > 0 && elapsed >= nextCoinWave) {
@@ -518,12 +633,8 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
             obj.group.position.z = obj.z;
             if (obj.kind === 'coin') {
                 obj.group.rotation.y += dt * 2.5;
-                if (crossedCoin(player.position.x, player.position.z, previousZ, obj.z, obj.x)) {
-                    runnerCoins += obj.value;
-                    hitSound.hit('coin');
-                    notices.show('+' + obj.value + ' Münzen');
-                    burst(obj.x, 1.7, obj.z, 'upgrade');
-                    removeObject(obj);
+                if (crossedCoin(player.position.x, player.position.z, previousZ, obj.z, obj.x, temporary.pickupRange)) {
+                    startCoinFlight(obj);
                 } else if (obj.z > player.position.z + 2) removeObject(obj);
                 continue;
             }
@@ -572,8 +683,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         for (let i = damageLabels.length - 1; i >= 0; i--) {
             const label = damageLabels[i];
             label.remaining -= dt;
-            label.sprite.position.y += 1.7 * dt;
-            label.sprite.material.opacity = Math.max(0, label.remaining / 0.8);
+            label.sprite.position.y += 3 * dt;
+            label.sprite.position.z += speed * dt;
+            label.sprite.material.opacity = Math.max(0, label.remaining / 0.9);
             if (label.remaining <= 0) {
                 scene.remove(label.sprite);
                 label.sprite.material.map?.dispose();
@@ -581,9 +693,11 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
                 damageLabels.splice(i, 1);
             }
         }
+        animateCoinFlights(dt);
         reportTimer -= dt;
         if (reportTimer <= 0) {
-            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: runnerCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
+            updateGateGuide();
+            onProgress({seconds: Math.ceil(remaining), collected: collected.length, coins: displayCoins, hp: Math.max(0, playerHp), temporary, notice: notices.text});
             reportTimer = 0.25;
         }
         renderer.render(scene, camera);
@@ -666,6 +780,9 @@ export function startRunner(host, {stage, upgrades = {}, roster = [], onProgress
         window.removeEventListener('keyup', keyUp);
         document.removeEventListener('visibilitychange', visibilityChange);
         for (const obj of [...objects]) removeObject(obj);
+        for (const flight of coinFlights) disposeGroup(flight.group);
+        coinFlights.length = 0;
+        gateGuide.remove();
         for (const bullet of bullets) {
             scene.remove(bullet.mesh);
             bullet.mesh.geometry.dispose();

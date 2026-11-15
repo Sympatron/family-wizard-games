@@ -92,3 +92,32 @@ test('shooting audio uses a short sawtooth effect and respects mute', () => {
         globalThis.AudioContext = original;
     }
 });
+
+test('cage breaking plays a distinct layered crash even immediately after a projectile impact', () => {
+    const original = globalThis.AudioContext;
+    const started = [];
+    class FakeAudioContext {
+        constructor() {this.state = 'running'; this.currentTime = 7; this.destination = {};}
+        createOscillator() {
+            return {
+                type: '',
+                frequency: {setValueAtTime() {}, exponentialRampToValueAtTime() {}},
+                connect() {}, start() {started.push(this.type);}, stop() {}
+            };
+        }
+        createGain() {return {gain: {setValueAtTime() {}, exponentialRampToValueAtTime() {}}, connect() {}};}
+        close() {return Promise.resolve();}
+    }
+    try {
+        globalThis.AudioContext = FakeAudioContext;
+        setHitSoundEnabled(true);
+        const player = createHitSound();
+        player.unlock();
+        player.hit('impact');
+        player.hit('cage');
+        assert.deepEqual(started, ['triangle', 'sawtooth', 'square', 'triangle']);
+        player.dispose();
+    } finally {
+        globalThis.AudioContext = original;
+    }
+});

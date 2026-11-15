@@ -61,12 +61,12 @@ test('saved Rank II dinosaurs migrate from legacy level two without losing the g
     old.run.phase = 'formation';
     old.run.army = [unit('d1', 'allosaurus', 2, 0)];
     const converted = migrateGame(old);
-    assert.equal(converted.version, 2);
+    assert.equal(converted.version, 3);
     assert.equal(converted.run.army[0].level, 1);
     assert.equal(old.run.army[0].level, 2);
     assert.equal(migrateGame(converted), converted);
     const next = apply(old, 'reserve', {id: 'd1'});
-    assert.equal(next.version, 2);
+    assert.equal(next.version, 3);
     assert.equal(next.run.inventory[0].level, 1);
 });
 

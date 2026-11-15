@@ -7,11 +7,18 @@ const FIRST_LANE_Y = 82;
 const FRONT_X = {player: 380, enemy: 580};
 const CELL_SPACING_X = 66;
 const CELL_SPACING_Y = 58;
+export const RESERVE_LAYOUT = Object.freeze({portrait: {left: 416, width: 124, center: 478}, landscape: {left: 768, width: 192, center: 864}});
+export function reserveSidebar(portrait) { return RESERVE_LAYOUT[portrait ? 'portrait' : 'landscape']; }
+export function reserveUnitPosition(index, portrait) { return {x: reserveSidebar(portrait).center, y: 95 + index * 84}; }
 
 export function toBattleScreen(x, y, portrait) {
     return portrait
-        ? {x: 72 + (y - FIRST_LANE_Y) * 1.65, y: 270 + (480 - x) * 0.85}
-        : {x: 480 + (y - 198) * 1.5, y: 270 + (480 - x) * 0.85};
+        ? {x: 46 + (y - FIRST_LANE_Y) * 1.33, y: 270 + (480 - x) * 0.85}
+        : {x: 104 + (y - FIRST_LANE_Y) * 2.55, y: 270 + (480 - x) * 0.85};
+}
+
+export function toCombatScreen(x, y, portrait) {
+    return {x: portrait ? 66 + (y - FIRST_LANE_Y) * 1.75 : 200 + (y - FIRST_LANE_Y) * 2.45, y: 310 + (480 - x) * 0.42};
 }
 
 export function battleCellCenter(team, cell, portrait) {
