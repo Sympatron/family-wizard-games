@@ -1,4 +1,5 @@
 import {SPECIES, maxHp, unitPower} from './game.js';
+import {dnaTypeForDino} from './skills.js';
 
 const TICK = 0.1;
 const distance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -8,8 +9,8 @@ const snapshot = (units, shots = []) => {
     return frame;
 };
 
-export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}) {
-    const units = [...army.map(unit => makeUnit(unit, 'player', upgrades, battleUpgrades)), ...enemies.map(unit => makeUnit(unit, 'enemy'))];
+export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}, skills = {}) {
+    const units = [...army.map(unit => makeUnit(unit, 'player', upgrades, battleUpgrades, skills)), ...enemies.map(unit => makeUnit(unit, 'enemy'))];
     const frames = [snapshot(units)];
     const teamSupport = Object.fromEntries(['player', 'enemy'].map(team => [
         team, Math.min(0.16, units.filter(unit => unit.team === team && unit.trait === 'support').length * 0.04)
@@ -85,17 +86,19 @@ export function simulateBattle(army, enemies, upgrades = {}, battleUpgrades = {}
     if (!winner) winner = units.reduce((sum, unit) => sum + (unit.team === 'player' ? unit.hp : -unit.hp), 0) > 0 ? 'player' : 'enemy';
     return {winner, frames, survivors: units.filter(u => u.team === 'player').map(u => ({id: u.id, hp: Math.round(u.hp)}))};
 }
-function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}) {
+function makeUnit(unit, team, upgrades = {}, battleUpgrades = {}, skills = {}) {
     const species = SPECIES[unit.species];
     const depth = Math.floor(unit.cell / 5);
     const lane = unit.cell % 5;
-    const unitMax = team === 'player' ? maxHp(unit, upgrades) : Math.max(1, unit.hp);
+    const unitMax = team === 'player' ? maxHp(unit, upgrades, skills) : Math.max(1, unit.hp);
+    const bonuses = team === 'player' ? skills[dnaTypeForDino(unit)] ?? {} : {};
     return {
         id: unit.id, team, species: unit.species, level: unit.level,
         x: team === 'player' ? 80 - depth * 90 : 880 + depth * 90,
         y: 82 + lane * 58,
         hp: Math.min(unitMax, unit.hp), maxHp: unitMax,
-        speed: species.speed, range: species.range, damage: Math.round(species.damage * unitPower(unit) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) : 1)),
+        speed: species.speed * (1 + (bonuses.speed ?? 0) * 0.04), range: species.range * (1 + (bonuses.range ?? 0) * 0.05),
+        damage: Math.round(species.damage * unitPower(unit) * (team === 'player' ? (1 + battleUpgrades.damage * 0.15) * (1 + (bonuses.damage ?? 0) * 0.06) : 1)),
         trait: unit.trait ?? species.trait, poison: 0, receivedAttacks: 0,
         attackTime: species.cooldown * ((unit.trait ?? species.trait) === 'rapid' ? 0.82 : 1),
         cooldown: 0.2, stunned: 0, attacks: 0
