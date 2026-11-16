@@ -88,7 +88,7 @@ test('legacy potion stock is refunded and replaced by the new run shop without l
     legacy.run.potions = 2;
     delete legacy.run.gunUpgrades;
     const migrated = migrateGame(legacy);
-    assert.equal(migrated.version, 4);
+    assert.equal(migrated.version, 5);
     assert.equal(migrated.run.money, 52);
     assert.equal(migrated.run.gunUpgrades.damage, 0);
     assert.ok(!Object.hasOwn(migrated.run, 'potions'));
