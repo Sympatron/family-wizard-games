@@ -141,7 +141,7 @@ test('saved games from version three receive DNA and skill defaults without rese
     delete old.meta.highestStage;
     old.run.stage = 17;
     const game = migrateGame(old);
-    assert.equal(game.version, 4);
+    assert.equal(game.version, 5);
     assert.equal(game.meta.currency, 123);
     assert.equal(game.meta.highestStage, 17);
     assert.deepEqual(game.meta.dna, {tank: 0, damageDealer: 0, sniper: 0});
