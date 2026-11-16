@@ -179,3 +179,43 @@ body {background:#0b1720;color:#eaf5ee;}
   #actions .dino-heal-card {min-height:78px;padding:7px;}
   .dino-heal-card img {width:62px;height:52px;flex-basis:62px;}
 }
+
+
+#skill-toggle {font-size:.75rem;font-weight:700;padding:6px 9px;border:1px solid #87c8a5;border-radius:9px;background:#294d3d;color:#f2f8e6;cursor:pointer;}
+#skill-toggle:focus-visible {outline:2px solid #f0ca7c;outline-offset:2px;}
+.dino-skill-dialog {width:min(1080px,calc(100vw - 20px));max-height:92dvh;box-sizing:border-box;padding:16px;color:#eaf5eb;background:#112b32;border:2px solid #8bce9a;border-radius:18px;box-shadow:0 25px 70px #000c;overflow-y:auto;}
+.dino-skill-dialog::backdrop {background:#06140fd9;}
+.dino-skill-heading {display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.dino-skill-heading h3 {font-size:1.4rem;margin:0;color:#eaf5bd;}
+.dino-skill-heading button,.dino-skill-tabs button {background:#284e4a;color:#f2f8ea;border:1px solid #76b6a8;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700;}
+.dino-skill-description {font-size:.9rem;color:#b8d9ce;line-height:1.4;margin:9px 0;}
+.dino-skill-tabs {display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;}
+.dino-skill-tabs button.active {background:#d8de97;color:#1c3831;border-color:#f1edb2;}
+.dino-skill-balance {display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:.9rem;padding:9px 12px;border-radius:9px;background:#25493f;color:#eaf5ea;}
+.dino-skill-balance span {color:#d0e4d0;}
+.dino-skill-scroll {max-height:min(65dvh,700px);overflow:auto;margin:12px 0;border-radius:24px;border:1px solid #3e7659;background:#122d23;}
+.dino-skill-crown {position:relative;width:1000px;height:700px;margin:0 auto;isolation:isolate;overflow:hidden;border-radius:49%;background:radial-gradient(ellipse 47% 39% at 50% 50%,#527b45 0%,#355d39 59%,transparent 100%),radial-gradient(ellipse at 47% 45%,#254c2f 15%,#1a3b2b 72%,#132c24 100%);box-shadow:inset 0 0 95px #0b2518;}
+.dino-skill-crown::before {content:'';position:absolute;inset:8% 11%;border:10px solid #567e4457;border-radius:50%;box-shadow:0 0 0 48px #4d79351f,0 0 0 95px #8cc35c0b;transform:rotate(-19deg);pointer-events:none;}
+.dino-skill-crown::after {content:'';position:absolute;inset:19% 26%;border:22px dotted #a5d36f28;border-radius:50%;pointer-events:none;transform:rotate(25deg);}
+.dino-skill-lines {position:absolute;inset:0;width:100%;height:100%;z-index:1;overflow:visible;}
+.dino-skill-branch {fill:none;stroke:#957654;stroke-width:15;stroke-linecap:round;opacity:.8;}
+.dino-skill-branch.complete {stroke:#c8a56d;}
+.dino-skill-root,.dino-skill-node {position:absolute;transform:translate(-50%,-50%);z-index:2;box-sizing:border-box;text-align:center;}
+.dino-skill-root {display:grid;place-items:center;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,#a67e47,#694d30);border:8px solid #c39b60;box-shadow:0 4px 22px #102417,0 0 0 12px #8ec3733d;font-size:1.15rem;font-weight:900;color:#fff4c6;}
+.dino-skill-node {display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;width:158px;min-height:112px;padding:9px 7px;border:4px solid #a4c881;border-radius:36px;background:linear-gradient(160deg,#427a57,#22493a);box-shadow:0 5px 15px #091c17b0;color:#f1fbe9;cursor:pointer;}
+.dino-skill-node strong {font-size:.9rem;line-height:1.12;overflow-wrap:anywhere;}
+.dino-skill-node span {font-size:.76rem;color:#e8f2c5;}
+.dino-skill-node small {font-size:.7rem;color:#d0e2d4;}
+.dino-skill-node em {font-style:normal;font-size:.75rem;font-weight:800;color:#ffe0a0;}
+.dino-skill-node.maxed {border-color:#eac77d;background:linear-gradient(160deg,#7e7841,#436143);}
+.dino-skill-node.locked {border-color:#bb9c6e;}
+.dino-skill-node:disabled {cursor:not-allowed;filter:saturate(.7);}
+.dino-skill-node:focus-visible,.dino-skill-tabs button:focus-visible {outline:3px solid #fff6b0;outline-offset:4px;}
+.dino-skill-footer {margin:4px 0;font-size:.8rem;color:#a6c4b9;}
+@media(max-width:650px) {
+  .dino-skill-dialog {padding:9px;max-height:96dvh;}
+  .dino-skill-scroll {max-height:60dvh;}
+  .dino-skill-heading h3 {font-size:1.1rem;}
+  .dino-skill-tabs button {padding:7px 8px;font-size:.77rem;}
+  .dino-skill-balance {font-size:.78rem;}
+}
