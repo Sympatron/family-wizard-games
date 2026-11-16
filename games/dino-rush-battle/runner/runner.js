@@ -23,7 +23,7 @@ import {volleyPattern, initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS} from './
 const DURATION = 35;
 const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
-export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
+export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, skills = {}, roster = [], onProgress, onFinish, onPauseChange = () => {}}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x142734);
     scene.fog = new THREE.Fog(0x142734, 85, 260);
@@ -184,7 +184,7 @@ export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roste
         scene.add(follower);
         followers.push(follower);
     }
-    const temporary = initialRunnerWeaponStats(upgrades, gunUpgrades);
+    const temporary = initialRunnerWeaponStats(upgrades, gunUpgrades, skills);
     let remaining = DURATION;
     let elapsed = 0;
     let playerHp = 3;
@@ -342,7 +342,7 @@ export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roste
         return group;
     }
     function spawnWave(goalZ) {
-        for (const item of createRunnerWave(spawnCount++, stage, Math.random, roster)) {
+        for (const item of createRunnerWave(spawnCount++, stage, Math.random, roster, skills)) {
             if (!canSpawnBeforeGoal(item.z, goalZ, 5) || blockedByGate(item.z, objects)) continue;
             const group = cage(item.species, item.rarity);
             group.position.set(item.x, 0, item.z);
@@ -606,7 +606,7 @@ export function startRunner(host, {stage, upgrades = {}, gunUpgrades = {}, roste
         finishGoal.position.z = finishLinePosition(player.position.z, speed, remaining);
         if (remaining > 0 && elapsed >= nextSpawn) {
             spawnWave(finishGoal.position.z);
-            nextSpawn += 3.7;
+            nextSpawn += 3.7 / (1 + Math.min(5, skills.spawn1 ?? 0) * 0.1);
         }
         if (remaining > 0 && elapsed >= nextGate) {
             spawnGates(finishGoal.position.z);
