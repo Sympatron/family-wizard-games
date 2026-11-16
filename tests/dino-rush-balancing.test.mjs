@@ -23,8 +23,9 @@ test('runner averages nine common cage encounters per early stage, with rare rew
     const early = Array.from({length: 9}, (_, wave) => createRunnerWave(wave, 1, random)).flat();
     assert.equal(early.length, 9);
     assert.ok(early.every(cage => cage.rarity === 'common' && cage.level === 1 && RUNNER_SPECIES.includes(cage.species)));
-    const late = Array.from({length: 900}, (_, wave) => createRunnerWave(wave, 12, random)).flat();
-    assert.ok(late.some(cage => cage.rarity === 'rare' && ADVANCED_SPECIES.includes(cage.species)));
+    const late = Array.from({length: 900}, (_, wave) => createRunnerWave(wave, 12, random, [], {spawn2: 5})).flat();
+    assert.ok(late.some(cage => ADVANCED_SPECIES.includes(cage.species)));
+    assert.ok(late.some(cage => cage.rarity === 'rare'));
     assert.ok(late.some(cage => cage.rarity === 'reinforced' && cage.level === 2));
     assert.ok(late.every(cage => cage.kind === 'cage' && cage.x >= -4.9 && cage.x <= 4.9));
     assert.ok(late.every(cage => cage.hp === cageHitPoints(12, cage.rarity)));
