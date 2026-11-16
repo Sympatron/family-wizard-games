@@ -6,7 +6,7 @@ import {DNA_TYPES, dnaTypeForDino, dnaValue, skillDefinitions, skillCost, isSkil
 
 export {SPECIES} from './species.js';
 export function migrateGame(game) {
-    if (!game || game.version >= 4) return game;
+    if (!game || game.version >= 5) return game;
     const result = structuredClone(game);
     if ((result.version ?? 1) < 2) {
         for (const unit of [...(result.run?.army ?? []), ...(result.run?.inventory ?? [])]) {
@@ -28,12 +28,12 @@ export function migrateGame(game) {
     result.meta.skills = normalizeSkillProgress(result.meta.skills);
     result.meta.dna = Object.fromEntries(Object.keys(DNA_TYPES).map(kind => [kind, Math.max(0, result.meta.dna?.[kind] ?? 0)]));
     result.meta.highestStage = Math.max(1, result.meta.highestStage ?? 1, result.run?.stage ?? 1);
-    result.version = 4;
+    result.version = 5;
     return result;
 }
 
 export const INITIAL_GAME = {
-    version: 4,
+    version: 5,
     meta: {currency: 0, upgrades: {starterHp: 0, runnerDamage: 0}, skills: createSkillProgress(), dna: {tank: 0, damageDealer: 0, sniper: 0}, highestStage: 1},
     run: createRun()
 };
@@ -228,7 +228,7 @@ export function reduceGame(game, action) {
             const upgraded = {id: 'd' + run.nextId++, species: into, level: evolves ? 1 : a.level + 1, cell: a.cell ?? b.cell ?? null, hp: 0};
             if (evolves && SPECIES[into].rank === 4) upgraded.trait = a.trait ?? SPECIES[a.species].trait;
             else if (!evolves && (a.trait || b.trait)) upgraded.trait = a.trait ?? b.trait;
-            upgraded.hp = maxHp(upgraded, next.meta.upgrades);
+            upgraded.hp = maxHp(upgraded, next.meta.upgrades, next.meta.skills);
             if (upgraded.cell === null) run.inventory.push(upgraded);
             else run.army.push(upgraded);
             return {game: next, message: SPECIES[upgraded.species].name + (evolves ? ' entwickelt!' : ' auf Tier ' + upgraded.level + ' fusioniert!')};
@@ -256,10 +256,11 @@ export function reduceGame(game, action) {
                 if (unit.hp > 0) unit.hp = Math.min(maxHp(unit, next.meta.upgrades, next.meta.skills), unit.hp + Math.round(maxHp(unit, next.meta.upgrades, next.meta.skills) * Math.min(1, 0.25 + (next.meta.skills[dnaTypeForDino(unit)]?.regeneration ?? 0) * 0.05)));
             }
             next.meta.highestStage = Math.max(next.meta.highestStage, run.stage);
+            next.meta.currency += run.stage;
             run.money += 25 + run.stage * 10;
             run.phase = 'rewards';
-            run.lastResult = {stage: run.stage, money: 25 + run.stage * 10};
-            return {game: next, message: 'Sieg! Deine Dinosaurier erholen sich etwas.'};
+            run.lastResult = {stage: run.stage, money: 25 + run.stage * 10, crystals: run.stage};
+            return {game: next, message: 'Sieg! +' + run.stage + ' Urzeitkristalle. Deine Dinosaurier erholen sich etwas.'};
         }
         case 'buy-battle-damage': {
             if (run.phase !== 'rewards') fail('Verbesserungen sind nur zwischen den Kämpfen möglich.');
