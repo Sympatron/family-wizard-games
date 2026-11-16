@@ -193,7 +193,8 @@ export function reduceGame(game, action) {
         case 'buy-skill': {
             if (!['formation', 'rewards', 'gameover'].includes(run.phase)) fail('Skills können nur zwischen den Runden verbessert werden.');
             const {group, skill} = action.payload ?? {};
-            const definition = skillDefinitions(group)?.[skill];
+            const definitions = skillDefinitions(group);
+            const definition = definitions && Object.hasOwn(definitions, skill) ? definitions[skill] : null;
             if (!definition) fail('Unbekannter Skill.');
             if (!isSkillVisible(next.meta, group, skill)) fail('Der vorherige Skill muss zuerst maximiert werden.');
             const level = getSkillLevel(next.meta, group, skill);
