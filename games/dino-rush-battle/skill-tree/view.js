@@ -3,7 +3,7 @@ import {DNA_TYPES, PASSIVE_NAMES, skillDefinitions, skillCost, getSkillLevel, is
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TREE_WIDTH = 1600;
 const TREE_HEIGHT = 1200;
-const MIN_ZOOM = 0.35;
+const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 1.75;
 const GROUPS = Object.freeze([
     {key: 'runner', label: 'Spieler', currency: 'Urzeitkristalle'},
