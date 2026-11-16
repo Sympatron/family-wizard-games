@@ -96,7 +96,7 @@ export class BattleView {
             return {backing, arrow};
         });
         this.trashElements = [
-            scene.add.circle(width - 35, 34, 29, 0x713c45, 0.95).setStrokeStyle(3, 0xf3b4a3).setDepth(7),
+            scene.add.rectangle(width - 35, 34, 58, 58, 0x713c45, 0.95).setStrokeStyle(3, 0xf3b4a3).setDepth(7),
             scene.add.text(width - 35, 33, '🗑', {fontSize: '29px', fontFamily: 'system-ui'}).setOrigin(0.5).setDepth(8),
             scene.add.text(width - 35, 60, 'DNA', {fontSize: '11px', fontFamily: 'system-ui', fontStyle: 'bold', color: '#ffe3a5'}).setOrigin(0.5).setDepth(8)
         ];
@@ -400,7 +400,7 @@ export class BattleView {
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
         }
         for (const layer of this.formationLayers) layer.setVisible(isFormation);
-        for (const element of this.trashElements) element.setVisible(isFormation);
+        for (const element of this.trashElements ?? []) element.setVisible(isFormation);
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
         }
