@@ -13,15 +13,20 @@ export const RUNNER_SKILLS = Object.freeze({
     spawn1: {label: 'Käfige · Rang 1', effect: 'Mehr Käfige', maxLevel: 5, baseCost: 7, costStep: 6, requires: ['damage'], x: 82, y: 24},
     spawn2: {label: 'Käfige · Rang 2', effect: 'Höhere Spawnchance', maxLevel: 5, baseCost: 15, costStep: 10, requires: ['spawn1'], x: 88, y: 44},
     spawn3: {label: 'Käfige · Rang 3', effect: 'Höhere Spawnchance', maxLevel: 5, baseCost: 35, costStep: 20, requires: ['spawn2'], x: 77, y: 66},
-    spawn4: {label: 'Käfige · Rang 4', effect: 'Höhere Spawnchance', maxLevel: 5, baseCost: 70, costStep: 35, requires: ['spawn3'], minStage: 150, x: 58, y: 82}
+    spawn4: {label: 'Käfige · Rang 4', effect: 'Höhere Spawnchance', maxLevel: 5, baseCost: 70, costStep: 35, requires: ['spawn3'], minStage: 150, x: 58, y: 82},
+    lightning: {label: 'Kettenblitz', effect: 'Flächenschaden im Kampf', maxLevel: 5, baseCost: 18, costStep: 15, requires: ['fireRate']}
 });
 export const ARENA_SKILLS = Object.freeze({
-    damage: {label: 'Schaden', effect: '+6 %', maxLevel: 5, baseCost: 2, costStep: 2, requires: [], x: 50, y: 30},
-    health: {label: 'Leben', effect: '+6 %', maxLevel: 5, baseCost: 3, costStep: 3, requires: ['damage'], x: 27, y: 25},
-    speed: {label: 'Tempo', effect: '+4 %', maxLevel: 5, baseCost: 3, costStep: 3, requires: ['damage'], x: 73, y: 25},
-    regeneration: {label: 'Regeneration', effect: '+5 % pro Runde', maxLevel: 5, baseCost: 5, costStep: 4, requires: ['health'], x: 18, y: 53},
-    range: {label: 'Reichweite', effect: '+5 %', maxLevel: 5, baseCost: 4, costStep: 4, requires: ['speed'], x: 82, y: 53}
+    damage: {label: 'Schaden', effect: '+6 %', maxLevel: 5, baseCost: 2, costStep: 2, requires: []},
+    health: {label: 'Leben', effect: '+6 %', maxLevel: 5, baseCost: 3, costStep: 3, requires: []},
+    speed: {label: 'Tempo', effect: '+4 %', maxLevel: 5, baseCost: 3, costStep: 3, requires: []},
+    regeneration: {label: 'Regeneration', effect: '+5 % pro Runde', maxLevel: 5, baseCost: 5, costStep: 4, requires: ['health']},
+    range: {label: 'Reichweite', effect: '+5 %', maxLevel: 5, baseCost: 4, costStep: 4, requires: ['speed']},
+    passive: {label: 'Passivfähigkeit', effect: 'Automatisch mit Cooldown', maxLevel: 5, baseCost: 15, costStep: 10, requires: ['regeneration', 'range']}
 });
+export const PASSIVE_NAMES = Object.freeze({tank: 'Panzerwall', damageDealer: 'Kampfrausch', sniper: 'Präzisionsschuss'});
+export const lightningCooldown = level => Math.max(5, 12 - Math.max(0, level - 1) * 1.25);
+export const lightningDamage = level => level > 0 ? 32 + level * 16 : 0;
 export const skillDefinitions = group => group === 'runner' ? RUNNER_SKILLS : Object.hasOwn(DNA_TYPES, group) ? ARENA_SKILLS : null;
 export const dnaTypeForRole = role => Object.keys(DNA_TYPES).find(key => DNA_TYPES[key].role === role);
 export const dnaTypeForDino = unit => dnaTypeForRole(SPECIES[unit.species]?.role);
