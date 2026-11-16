@@ -22,7 +22,7 @@ export const ARENA_SKILLS = Object.freeze({
     regeneration: {label: 'Regeneration', effect: '+5 % pro Runde', maxLevel: 5, baseCost: 5, costStep: 4, requires: ['health'], x: 18, y: 53},
     range: {label: 'Reichweite', effect: '+5 %', maxLevel: 5, baseCost: 4, costStep: 4, requires: ['speed'], x: 82, y: 53}
 });
-export const skillDefinitions = group => group === 'runner' ? RUNNER_SKILLS : DNA_TYPES[group] ? ARENA_SKILLS : null;
+export const skillDefinitions = group => group === 'runner' ? RUNNER_SKILLS : Object.hasOwn(DNA_TYPES, group) ? ARENA_SKILLS : null;
 export const dnaTypeForRole = role => Object.keys(DNA_TYPES).find(key => DNA_TYPES[key].role === role);
 export const dnaTypeForDino = unit => dnaTypeForRole(SPECIES[unit.species]?.role);
 
@@ -38,13 +38,14 @@ export function getSkillLevel(meta, group, skill) {
     return meta?.skills?.[group]?.[skill] ?? 0;
 }
 export function skillCost(group, skill, level) {
-    const definition = skillDefinitions(group)?.[skill];
+    const definitions = skillDefinitions(group);
+    const definition = definitions && Object.hasOwn(definitions, skill) ? definitions[skill] : null;
     if (!definition || !Number.isInteger(level) || level < 0 || level >= definition.maxLevel) throw new Error('Ungültiges Skill-Level.');
     return definition.baseCost + level * definition.costStep;
 }
 export function isSkillVisible(meta, group, skill) {
     const definitions = skillDefinitions(group);
-    const definition = definitions?.[skill];
+    const definition = definitions && Object.hasOwn(definitions, skill) ? definitions[skill] : null;
     return !!definition && definition.requires.every(parent => getSkillLevel(meta, group, parent) >= definitions[parent].maxLevel);
 }
 export function getUnlockedRunnerRank(skills = {}) {
