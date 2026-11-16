@@ -219,3 +219,6 @@ body {background:#0b1720;color:#eaf5ee;}
   .dino-skill-tabs button {padding:7px 8px;font-size:.77rem;}
   .dino-skill-balance {font-size:.78rem;}
 }
+
+.dino-dna-balances {width:100%;font-size:.8rem;text-align:center;color:#b8e9cb;}
+.dino-dna-yield {color:#ffe4a4!important;}
