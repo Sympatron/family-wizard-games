@@ -4,12 +4,12 @@ import {watchDeployment} from '../../shared/deploy-watch.js';
 import {INITIAL_GAME, SPECIES, getEnemies, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
-import {simulateBattle} from './core/battle.js';
+import {simulateBattle, BATTLE_FRAME_SECONDS} from './core/battle.js';
 import {BattleView} from './battle/view.js';
 import {createRunnerHud} from './runner/hud.js';
 import {healingCost} from './core/shop.js';
-import {DNA_TYPES, dnaTypeForDino, dnaValue} from './core/skills.js';
-import {renderSkillTree} from './skill-tree/view.js';
+import {DNA_TYPES, dnaTypeForDino, dnaValue, lightningCooldown} from './core/skills.js';
+import {renderSkillTree, centerSkillTree} from './skill-tree/view.js';
 import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -52,22 +52,16 @@ document.body.append(mergeDialog);
 const skillDialog = document.createElement('dialog');
 skillDialog.className = 'dino-skill-dialog';
 document.body.append(skillDialog);
-let selectedSkillGroup = 'runner';
 function refreshSkillTree() {
-    renderSkillTree(skillDialog, state.game, selectedSkillGroup,
-        (group, skill) => void execute('buy-skill', {group, skill}),
-        group => { selectedSkillGroup = group; refreshSkillTree(); });
-    if (skillDialog.open) {
-        const viewport = skillDialog.querySelector('.dino-skill-scroll');
-        viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
-    }
+    renderSkillTree(skillDialog, state.game, (group, skill) => void execute('buy-skill', {group, skill}));
 }
 function showSkillTree() {
     if (!state || !['formation', 'rewards', 'gameover'].includes(state.game.run.phase)) return;
     refreshSkillTree();
-    if (!skillDialog.open) skillDialog.showModal();
-    const viewport = skillDialog.querySelector('.dino-skill-scroll');
-    viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+    if (!skillDialog.open) {
+        skillDialog.showModal();
+        centerSkillTree(skillDialog, true);
+    }
 }
 skillToggle?.addEventListener('click', showSkillTree);
 
@@ -263,17 +257,44 @@ function formation() {
 }
 function beginBattle() {
     heading.textContent = 'Dino-Kampf';
-    help.textContent = 'Der Kampf läuft automatisch. Die Aufstellung entscheidet über den Ausgang.';
+    help.textContent = 'Deine Dinosaurier kämpfen automatisch. Freigeschaltete Spielerfähigkeiten kannst du selbst einsetzen.';
     actions.replaceChildren();
     const game = state.game;
-    const result = simulateBattle(game.run.army, getEnemies(game.run.stage), game.meta.upgrades, game.run.battleUpgrades, game.meta.skills);
-    activeView.play(result.frames, () => void execute('resolve-battle', {winner: result.winner, survivors: result.survivors}));
+    const args = [game.run.army, getEnemies(game.run.stage), game.meta.upgrades, game.run.battleUpgrades, game.meta.skills];
+    let casts = [];
+    let result = simulateBattle(...args, casts);
+    const level = game.meta.skills.runner.lightning ?? 0;
+    let nextCastFrame = 0;
+    let lightningButton = null;
+    const refreshLightning = frameIndex => {
+        if (!lightningButton) return;
+        const remaining = Math.max(0, nextCastFrame - frameIndex);
+        lightningButton.disabled = remaining > 0 || !activeView?.playback;
+        lightningButton.textContent = remaining ? 'Blitz lädt: ' + Math.ceil(remaining * BATTLE_FRAME_SECONDS) + ' s'
+            : '⚡ Kettenblitz einsetzen · L' + level;
+    };
+    if (level > 0) {
+        lightningButton = addButton(actions, '⚡ Kettenblitz einsetzen · L' + level, () => {
+            if (activePhase !== 'battle' || !activeView?.playback) return;
+            const frame = activeView.playback.index + 1;
+            if (frame < nextCastFrame) return;
+            const nextCasts = [...casts, {frame, ability: 'lightning'}];
+            const revised = simulateBattle(...args, nextCasts);
+            if (!activeView.replacePlaybackFrames(revised.frames)) return;
+            casts = nextCasts;
+            result = revised;
+            nextCastFrame = frame + Math.ceil(lightningCooldown(level) / BATTLE_FRAME_SECONDS);
+            refreshLightning(activeView.playback.index);
+        });
+        lightningButton.classList.add('dino-combat-ability');
+    }
+    activeView.play(result.frames, () => void execute('resolve-battle', {winner: result.winner, survivors: result.survivors}), refreshLightning);
     hud.textContent = 'Dein Team gegen die Dinos der Stufe ' + game.run.stage;
 }
 function rewards() {
     const run = state.game.run;
     heading.textContent = 'Sieg! Stufe ' + run.stage + ' geschafft';
-    hud.textContent = '+' + run.lastResult.money + ' Münzen · Guthaben: ' + run.money + ' Münzen';
+    hud.textContent = '+' + run.lastResult.money + ' Münzen · +' + (run.lastResult.crystals ?? 0) + ' Kristalle · Guthaben: ' + run.money + ' Münzen';
     help.textContent = 'Dauerhafte Waffen- und Klassenupgrades stehen im Skillbaum. Verletzte Dinos kannst du mit Münzen heilen.';
     actions.replaceChildren();
 
