@@ -26,6 +26,7 @@ export class BattleView {
         this.mode = 'formation';
         this.playback = null;
         this.lastShotFrame = -1;
+        this.lastEffectFrame = -1;
         this.hitSound = createHitSound();
         this.previousHp = new Map();
         this.units = new Map();
@@ -280,14 +281,23 @@ export class BattleView {
         this.render();
     }
 
-    play(frames, complete) {
+    play(frames, complete, onFrame = () => {}) {
         this.hitSound?.unlock();
         this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
         this.lastShotFrame = -1;
+        this.lastEffectFrame = -1;
         this.mode = 'battle';
         this.drag = null;
-        this.playback = {frames, index: 0, elapsed: 0, complete};
+        this.playback = {frames, index: 0, elapsed: 0, complete, onFrame};
         this.render();
+        onFrame(0);
+    }
+
+    replacePlaybackFrames(frames) {
+        if (!this.playback || frames.length <= this.playback.index) return false;
+        this.playback.frames = frames;
+        this.render();
+        return true;
     }
 
     update(delta) {
@@ -295,10 +305,11 @@ export class BattleView {
         if (this.playback && this.mode === 'battle') {
             const playback = this.playback;
             playback.elapsed += Math.min(100, delta);
-            while (playback.elapsed >= 95 && playback.index < playback.frames.length - 1) {
-                playback.elapsed -= 95;
+            while (playback.elapsed >= 135 && playback.index < playback.frames.length - 1) {
+                playback.elapsed -= 135;
                 playback.index++;
                 this.render();
+                playback.onFrame(playback.index);
             }
             if (playback.index >= playback.frames.length - 1) {
                 this.playback = null;
@@ -354,6 +365,24 @@ export class BattleView {
         }
         this.hitSound?.hit('impact');
     }
+    emitCombatEffect(effect) {
+        if (!this.scene?.tweens) return;
+        const {x, y} = this.toScreen(effect.x, effect.y);
+        const color = {lightning: 0x9be8ff, shield: 0x8affbd, rage: 0xffa17c, precision: 0xebd0ff}[effect.type] ?? 0xffffff;
+        const large = effect.type === 'lightning';
+        const marker = this.scene.add.ellipse(x, y, large ? 190 : 54, large ? 95 : 36, color, 0.32)
+            .setStrokeStyle(large ? 6 : 3, color, 0.95).setDepth(20);
+        this.scene.tweens.add({
+            targets: marker, alpha: 0, scale: large ? 1.6 : 1.3, duration: large ? 620 : 420, ease: 'Quad.Out',
+            onComplete: () => marker.destroy()
+        });
+        if (large) {
+            const bolt = this.scene.add.text(x, y - 35, '⚡', {fontFamily: 'system-ui', fontSize: '54px', color: '#ccf8ff'})
+                .setOrigin(0.5).setDepth(21);
+            this.scene.tweens.add({targets: bolt, y: y + 20, alpha: 0, duration: 430, onComplete: () => bolt.destroy()});
+            this.hitSound?.hit('impact');
+        }
+    }
     emitRangedProjectile(shot) {
         if (!this.scene?.tweens) return;
         const from = this.toScreen(shot.x, shot.y);
@@ -398,6 +427,10 @@ export class BattleView {
         if (!isFormation && this.playback && this.playback.index !== this.lastShotFrame) {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
+        }
+        if (!isFormation && this.playback && this.playback.index !== this.lastEffectFrame) {
+            this.lastEffectFrame = this.playback.index;
+            for (const effect of frame.effects ?? []) this.emitCombatEffect(effect);
         }
         for (const layer of this.formationLayers) layer.setVisible(isFormation);
         for (const element of this.trashElements ?? []) element.setVisible(isFormation);
