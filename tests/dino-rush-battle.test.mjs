@@ -232,7 +232,9 @@ test('coins collected during runner add to in-run money and reject invalid rewar
 });
 
 test('rare cages rescue evolved species and reinforced cages rescue Tier II', () => {
-    const game = apply(fresh(), 'complete-runner', {collected: [{species: 'allosaurus', level: 1}, {species: 'triceratops', level: 2}]});
+    const unlocked = fresh();
+    unlocked.meta.skills.runner.spawn2 = 1;
+    const game = apply(unlocked, 'complete-runner', {collected: [{species: 'allosaurus', level: 1}, {species: 'triceratops', level: 2}]});
     assert.equal(game.run.army.find(unit => unit.species === 'allosaurus').level, 1);
     assert.equal(game.run.army.find(unit => unit.species === 'triceratops').level, 2);
     assert.throws(() => apply(fresh(), 'complete-runner', {collected: [{species: 'tyrannosaurus', level: 1}]}));

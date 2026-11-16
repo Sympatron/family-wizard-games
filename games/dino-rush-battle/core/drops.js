@@ -6,6 +6,7 @@ export function resolveFormationDrop(run, id, target) {
     const pool = [...run.army, ...run.inventory];
     const source = pool.find(unit => unit.id === id);
     if (!source) return null;
+    if (drop.trash) return {type: 'recycle-dino', payload: {id}};
     const other = drop.unitId ? pool.find(unit => unit.id === drop.unitId)
         : Number.isInteger(drop.cell) ? run.army.find(unit => unit.cell === drop.cell) : null;
     if (other?.id === id) return null;

@@ -4,11 +4,12 @@ import {watchDeployment} from '../../shared/deploy-watch.js';
 import {INITIAL_GAME, SPECIES, getEnemies, maxHp, migrateGame, reduceGame, unitPower} from './core/game.js';
 import {resolveFormationDrop} from './core/drops.js';
 import {isHitSoundEnabled, setHitSoundEnabled} from './core/hit-sound.js';
-import {simulateBattle} from './core/battle.js';
+import {simulateBattle, BATTLE_FRAME_SECONDS} from './core/battle.js';
 import {BattleView} from './battle/view.js';
 import {createRunnerHud} from './runner/hud.js';
-import {initialRunnerWeaponStats, SHOT_INTERVAL_SECONDS, MAX_BULLETS} from './runner/shots.js';
-import {GUN_UPGRADES, gunUpgradeCost, healingCost} from './core/shop.js';
+import {healingCost} from './core/shop.js';
+import {DNA_TYPES, dnaTypeForDino, dnaValue, lightningCooldown} from './core/skills.js';
+import {renderSkillTree, centerSkillTree} from './skill-tree/view.js';
 import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
 const backend = createGameBackend({gameId: 'dino-rush-battle', initialGame: INITIAL_GAME, reducer: reduceGame});
@@ -22,6 +23,7 @@ const message = document.querySelector('#message');
 const help = document.querySelector('#help');
 const soundToggle = document.querySelector('#sound-toggle');
 const pauseToggle = document.querySelector('#pause-toggle');
+const skillToggle = document.querySelector('#skill-toggle');
 function renderSoundToggle() {
     const enabled = isHitSoundEnabled();
     if (!soundToggle) return;
@@ -47,6 +49,21 @@ let runnerStartToken = 0;
 const mergeDialog = document.createElement('dialog');
 mergeDialog.className = 'dino-merge-dialog';
 document.body.append(mergeDialog);
+const skillDialog = document.createElement('dialog');
+skillDialog.className = 'dino-skill-dialog';
+document.body.append(skillDialog);
+function refreshSkillTree() {
+    renderSkillTree(skillDialog, state.game, (group, skill) => void execute('buy-skill', {group, skill}));
+}
+function showSkillTree() {
+    if (!state || !['formation', 'rewards', 'gameover'].includes(state.game.run.phase)) return;
+    refreshSkillTree();
+    if (!skillDialog.open) {
+        skillDialog.showModal();
+        centerSkillTree(skillDialog, true);
+    }
+}
+skillToggle?.addEventListener('click', showSkillTree);
 
 function addButton(parent, label, callback, {disabled = false, selected: isSelected = false} = {}) {
     const button = document.createElement('button');
@@ -90,6 +107,9 @@ function dropDinosaur(id, target) {
     if (result.type === 'merge-choice') {
         if (result.choices.length === 1) void execute('merge', {ids: result.ids, into: result.choices[0]});
         else chooseEvolution(result.ids, result.choices);
+    } else if (result.type === 'recycle-dino') {
+        const unit = [...state.game.run.army, ...state.game.run.inventory].find(item => item.id === id);
+        if (unit && window.confirm('Möchtest du ' + SPECIES[unit.species].name + ' unwiderruflich in DNA umwandeln?')) void execute('recycle-dino', {id});
     } else void execute(result.type, result.payload);
 }
 function paragraph(parent, text) {
@@ -105,6 +125,7 @@ async function execute(type, payload = undefined) {
     try {
         const next = await backend.execute({id: crypto.randomUUID(), type, payload});
         apply(next);
+        if (skillDialog.open) refreshSkillTree();
         if (next.message) message.textContent = next.message;
     } catch (error) {
         message.textContent = error.message;
@@ -117,6 +138,7 @@ async function refresh() {
 function cleanup() {
     runnerStartToken++;
     if (mergeDialog.open) mergeDialog.close();
+    if (skillDialog.open) skillDialog.close();
     activeView?.destroy();
     activeView = null;
     host.replaceChildren();
@@ -170,8 +192,9 @@ function renderFormationStats(unit, run) {
         return;
     }
     const type = SPECIES[unit.species];
-    const maximum = maxHp(unit, state.game.meta.upgrades);
-    const damage = Math.round(type.damage * unitPower(unit) * (1 + run.battleUpgrades.damage * 0.15));
+    const maximum = maxHp(unit, state.game.meta.upgrades, state.game.meta.skills);
+    const skills = state.game.meta.skills[dnaTypeForDino(unit)];
+    const damage = Math.round(type.damage * unitPower(unit) * (1 + run.battleUpgrades.damage * 0.15) * (1 + skills.damage * 0.06));
     const make = (tag, className, content) => {
         const element = document.createElement(tag);
         element.className = className;
@@ -192,7 +215,8 @@ function renderFormationStats(unit, run) {
         support: 'Unterstützung', cleave: 'Flächenschaden', poison: 'Gift', reflect: 'Reflexion', heal: 'Heilung'};
     identity.append(make('strong', '', type.name),
         make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role),
-        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'));
+        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'),
+        make('small', 'dino-dna-yield', 'DNA-Wert: ' + dnaValue(unit) + ' ' + DNA_TYPES[dnaTypeForDino(unit)].label));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
     const health = make('div', 'dino-stat-health');
     health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
@@ -202,7 +226,8 @@ function renderFormationStats(unit, run) {
     meter.setAttribute('aria-label', 'Lebenspunkte');
     const grid = make('div', 'dino-stat-grid');
     for (const [label, value] of [
-        ['Schaden', damage], ['Reichweite', type.range], ['Tempo', type.speed], ['Angriff', type.cooldown + ' s']
+        ['Schaden', damage], ['Reichweite', Math.round(type.range * (1 + skills.range * 0.05))],
+        ['Tempo', Math.round(type.speed * (1 + skills.speed * 0.04))], ['Angriff', type.cooldown + ' s']
     ]) {
         const stat = make('div', 'dino-stat-value');
         stat.append(make('small', '', label), make('strong', '', String(value)));
@@ -216,54 +241,62 @@ function formation() {
     const enemies = getEnemies(run.stage);
     const all = [...run.army, ...run.inventory];
     if (!all.some(unit => unit.id === selected)) selected = all[0]?.id ?? null;
-    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory);
+    activeView.showFormation(run.army, enemies, selected, state.game.meta.upgrades, run.inventory, state.game.meta.skills);
     heading.textContent = 'Dino-Team aufstellen';
     renderFormationStats(all.find(item => item.id === selected), run);
-    help.textContent = 'Dinos per Drag & Drop auf Felder oder in den Vorrat ziehen. Zwei gleiche Dinos zum Fusionieren aufeinanderziehen.';
+    help.textContent = 'Dinos auf Felder, in den Vorrat oder zum Fusionieren ziehen. Oben rechts: Trashcan verwandelt Dinos in Klassen-DNA.';
     actions.replaceChildren();
     const row = document.createElement('div');
     row.className = 'action-row';
     addButton(row, 'Kampf starten', () => void execute('start-battle'), {disabled: !run.army.some(unit => unit.hp > 0)});
     addButton(row, 'Entwicklungsbaum', showEvolutionTree);
+    addButton(row, 'Skillbaum / DNA', showSkillTree);
     actions.append(row);
+    const dna = state.game.meta.dna;
+    paragraph(actions, 'Tank-DNA: ' + dna.tank + ' · Damage-Dealer-DNA: ' + dna.damageDealer + ' · Sniper-DNA: ' + dna.sniper).className = 'dino-dna-balances';
 }
 function beginBattle() {
     heading.textContent = 'Dino-Kampf';
-    help.textContent = 'Der Kampf läuft automatisch. Die Aufstellung entscheidet über den Ausgang.';
+    help.textContent = 'Deine Dinosaurier kämpfen automatisch. Freigeschaltete Spielerfähigkeiten kannst du selbst einsetzen.';
     actions.replaceChildren();
     const game = state.game;
-    const result = simulateBattle(game.run.army, getEnemies(game.run.stage), game.meta.upgrades, game.run.battleUpgrades);
-    activeView.play(result.frames, () => void execute('resolve-battle', {winner: result.winner, survivors: result.survivors}));
+    const args = [game.run.army, getEnemies(game.run.stage), game.meta.upgrades, game.run.battleUpgrades, game.meta.skills];
+    let casts = [];
+    let result = simulateBattle(...args, casts);
+    const level = game.meta.skills.runner.lightning ?? 0;
+    let nextCastFrame = 0;
+    let lightningButton = null;
+    const refreshLightning = frameIndex => {
+        if (!lightningButton) return;
+        const remaining = Math.max(0, nextCastFrame - frameIndex);
+        lightningButton.disabled = remaining > 0 || !activeView?.playback;
+        lightningButton.textContent = remaining ? 'Blitz lädt: ' + Math.ceil(remaining * BATTLE_FRAME_SECONDS) + ' s'
+            : '⚡ Kettenblitz einsetzen · L' + level;
+    };
+    if (level > 0) {
+        lightningButton = addButton(actions, '⚡ Kettenblitz einsetzen · L' + level, () => {
+            if (activePhase !== 'battle' || !activeView?.playback) return;
+            const frame = activeView.playback.index + 1;
+            if (frame < nextCastFrame) return;
+            const nextCasts = [...casts, {frame, ability: 'lightning'}];
+            const revised = simulateBattle(...args, nextCasts);
+            if (!activeView.replacePlaybackFrames(revised.frames)) return;
+            casts = nextCasts;
+            result = revised;
+            nextCastFrame = frame + Math.ceil(lightningCooldown(level) / BATTLE_FRAME_SECONDS);
+            refreshLightning(activeView.playback.index);
+        });
+        lightningButton.classList.add('dino-combat-ability');
+    }
+    activeView.play(result.frames, () => void execute('resolve-battle', {winner: result.winner, survivors: result.survivors}), refreshLightning);
     hud.textContent = 'Dein Team gegen die Dinos der Stufe ' + game.run.stage;
 }
 function rewards() {
     const run = state.game.run;
     heading.textContent = 'Sieg! Stufe ' + run.stage + ' geschafft';
-    hud.textContent = '+' + run.lastResult.money + ' Münzen · Guthaben: ' + run.money + ' Münzen';
-    help.textContent = 'Waffenupgrades bleiben für diesen Durchlauf erhalten. Verletzte Dinos können einzeln geheilt werden.';
+    hud.textContent = '+' + run.lastResult.money + ' Münzen · +' + (run.lastResult.crystals ?? 0) + ' Kristalle · Guthaben: ' + run.money + ' Münzen';
+    help.textContent = 'Dauerhafte Waffen- und Klassenupgrades stehen im Skillbaum. Verletzte Dinos kannst du mit Münzen heilen.';
     actions.replaceChildren();
-
-    const gunSection = document.createElement('section');
-    gunSection.className = 'dino-shop-section';
-    const gunTitle = document.createElement('h3');
-    gunTitle.textContent = 'Runner-Waffe verbessern';
-    const gunRow = document.createElement('div');
-    gunRow.className = 'dino-shop-gun-grid';
-    const base = initialRunnerWeaponStats(state.game.meta.upgrades, run.gunUpgrades);
-    for (const [kind, config] of Object.entries(GUN_UPGRADES)) {
-        const level = run.gunUpgrades[kind];
-        const maxed = config.maxLevel !== undefined && level >= config.maxLevel;
-        const cost = maxed ? null : gunUpgradeCost(kind, level);
-        const current = kind === 'damage' ? base.damage.toFixed(1) + ' Schaden/Kugel'
-            : kind === 'fireRate' ? (base.fireRate / SHOT_INTERVAL_SECONDS).toFixed(1) + ' Serien/s'
-            : base.bullets + '/' + MAX_BULLETS + ' Kugeln';
-        const button = addButton(gunRow, config.label + ' · ' + current + ' · ' + config.increase +
-            (maxed ? ' · MAX' : ' · ' + cost + ' Münzen'), () => void execute('buy-gun-upgrade', {kind}),
-        {disabled: maxed || run.money < cost});
-        button.classList.add('dino-shop-gun-upgrade');
-    }
-    gunSection.append(gunTitle, gunRow);
-    actions.append(gunSection);
 
     const healSection = document.createElement('section');
     healSection.className = 'dino-shop-section';
@@ -271,10 +304,10 @@ function rewards() {
     healTitle.textContent = 'Dinos heilen';
     const healList = document.createElement('div');
     healList.className = 'dino-heal-list';
-    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades));
+    const injured = [...run.army, ...run.inventory].filter(unit => unit.hp < maxHp(unit, state.game.meta.upgrades, state.game.meta.skills));
     if (!injured.length) paragraph(healList, 'Alle Dinos sind gesund.');
     for (const unit of injured) {
-        const maximum = maxHp(unit, state.game.meta.upgrades);
+        const maximum = maxHp(unit, state.game.meta.upgrades, state.game.meta.skills);
         const cost = healingCost(unit.hp, maximum);
         const button = document.createElement('button');
         button.type = 'button';
@@ -304,9 +337,7 @@ function rewards() {
 
     const row = document.createElement('div');
     row.className = 'action-row';
-    const damageCost = 30 + 20 * run.battleUpgrades.damage;
-    addButton(row, 'Team-Schaden +' + ((run.battleUpgrades.damage + 1) * 15) + '% (' + damageCost + ' Münzen)',
-        () => void execute('buy-battle-damage'), {disabled: run.money < damageCost});
+    addButton(row, 'Skillbaum / DNA', showSkillTree);
     addButton(row, 'Nächste Stufe', () => void execute('next-stage'));
     actions.append(row);
 }
@@ -320,11 +351,7 @@ function gameOver() {
     paragraph(actions, 'Kristalle verfügbar: ' + game.meta.currency);
     const row = document.createElement('div');
     row.className = 'action-row';
-    for (const [kind, label] of [['starterHp', 'Start-Lebenspunkte'], ['runnerDamage', 'Runner-Schaden']]) {
-        const level = game.meta.upgrades[kind];
-        const cost = 5 * (level + 1);
-        addButton(row, label + ' L' + (level + 1) + ' (' + cost + ' Kristalle)', () => void execute('upgrade', {kind}), {disabled: game.meta.currency < cost});
-    }
+    addButton(row, 'Skillbaum / DNA', showSkillTree);
     addButton(row, 'Neuen Lauf starten', () => void execute('new-run'));
     actions.append(row);
 }
@@ -345,7 +372,7 @@ async function beginRunner() {
         const {startRunner} = await import('./runner/runner.js');
         if (activePhase !== 'runner' || token !== runnerStartToken) return;
         activeView = startRunner(host, {
-        stage: game.run.stage, upgrades: game.meta.upgrades, gunUpgrades: game.run.gunUpgrades,
+        stage: game.run.stage, upgrades: game.meta.upgrades, gunUpgrades: game.run.gunUpgrades, skills: game.meta.skills.runner,
         roster: [...game.run.army, ...game.run.inventory].map(unit => unit.species),
         onPauseChange: paused => {
             if (pauseToggle) {
@@ -384,6 +411,7 @@ function apply(snapshot) {
         stats.textContent = moneyLabel(snapshot.game);
         stage.className = 'dino-stage ' + phase;
         if (pauseToggle) pauseToggle.hidden = phase !== 'runner';
+        if (skillToggle) skillToggle.hidden = !['formation', 'rewards', 'gameover'].includes(phase);
         hud.classList.toggle('dino-stats-panel', phase === 'formation');
         hud.classList.toggle('dino-runner-hud', phase === 'runner');
         if (phase !== activePhase || snapshot.user.id !== previousUser) {

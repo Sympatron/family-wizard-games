@@ -120,6 +120,17 @@ test('dropping a deployed dinosaur into empty reserve space works with mouse and
     }
 });
 
+test('dragging a dinosaur into the upper-right trashcan targets DNA recycling', () => {
+    for (const portrait of [true, false]) {
+        const {view, events, send} = createView(portrait, {army: [unit('d1', 'raptor', 0)]});
+        const from = view.cellCenter('player', 0);
+        send('pointerdown', from, 3, 'touch');
+        send('pointermove', {x: view.width - 34, y: 34}, 3, 'touch');
+        send('pointerup', {x: view.width - 34, y: 34}, 3, 'touch');
+        assert.deepEqual(events, [{type: 'drop', id: 'd1', target: {trash: true}}]);
+    }
+});
+
 test('mouse clicks and short touch taps can inspect units but never move or merge them', () => {
     for (const pointerType of ['mouse', 'touch']) {
         const {view, events, send} = createView(false, {army: [unit('d1', 'raptor', 0), unit('d2', 'raptor', 3)]});

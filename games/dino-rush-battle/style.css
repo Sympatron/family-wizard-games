@@ -179,3 +179,114 @@ body {background:#0b1720;color:#eaf5ee;}
   #actions .dino-heal-card {min-height:78px;padding:7px;}
   .dino-heal-card img {width:62px;height:52px;flex-basis:62px;}
 }
+
+
+#skill-toggle {font-size:.75rem;font-weight:700;padding:6px 9px;border:1px solid #87c8a5;border-radius:9px;background:#294d3d;color:#f2f8e6;cursor:pointer;}
+#skill-toggle:focus-visible {outline:2px solid #f0ca7c;outline-offset:2px;}
+.dino-skill-dialog {width:min(1080px,calc(100vw - 20px));max-height:92dvh;box-sizing:border-box;padding:16px;color:#eaf5eb;background:#112b32;border:2px solid #8bce9a;border-radius:18px;box-shadow:0 25px 70px #000c;overflow-y:auto;}
+.dino-skill-dialog::backdrop {background:#06140fd9;}
+.dino-skill-heading {display:flex;justify-content:space-between;align-items:center;gap:16px;}
+.dino-skill-heading h3 {font-size:1.4rem;margin:0;color:#eaf5bd;}
+.dino-skill-heading button,.dino-skill-tabs button {background:#284e4a;color:#f2f8ea;border:1px solid #76b6a8;border-radius:10px;padding:9px 13px;cursor:pointer;font-weight:700;}
+.dino-skill-description {font-size:.9rem;color:#b8d9ce;line-height:1.4;margin:9px 0;}
+.dino-skill-tabs {display:flex;flex-wrap:wrap;gap:7px;margin:12px 0;}
+.dino-skill-tabs button.active {background:#d8de97;color:#1c3831;border-color:#f1edb2;}
+.dino-skill-balance {display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:.9rem;padding:9px 12px;border-radius:9px;background:#25493f;color:#eaf5ea;}
+.dino-skill-balance span {color:#d0e4d0;}
+.dino-skill-scroll {max-height:min(65dvh,700px);overflow:auto;margin:12px 0;border-radius:24px;border:1px solid #3e7659;background:#122d23;}
+.dino-skill-crown {position:relative;width:1000px;height:700px;margin:0 auto;isolation:isolate;overflow:hidden;border-radius:49%;background:radial-gradient(ellipse 47% 39% at 50% 50%,#527b45 0%,#355d39 59%,transparent 100%),radial-gradient(ellipse at 47% 45%,#254c2f 15%,#1a3b2b 72%,#132c24 100%);box-shadow:inset 0 0 95px #0b2518;}
+.dino-skill-crown::before {content:'';position:absolute;inset:8% 11%;border:10px solid #567e4457;border-radius:50%;box-shadow:0 0 0 48px #4d79351f,0 0 0 95px #8cc35c0b;transform:rotate(-19deg);pointer-events:none;}
+.dino-skill-crown::after {content:'';position:absolute;inset:19% 26%;border:22px dotted #a5d36f28;border-radius:50%;pointer-events:none;transform:rotate(25deg);}
+.dino-skill-lines {position:absolute;inset:0;width:100%;height:100%;z-index:1;overflow:visible;}
+.dino-skill-branch {fill:none;stroke:#957654;stroke-width:15;stroke-linecap:round;opacity:.8;}
+.dino-skill-branch.complete {stroke:#c8a56d;}
+.dino-skill-root,.dino-skill-node {position:absolute;transform:translate(-50%,-50%);z-index:2;box-sizing:border-box;text-align:center;}
+.dino-skill-root {display:grid;place-items:center;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,#a67e47,#694d30);border:8px solid #c39b60;box-shadow:0 4px 22px #102417,0 0 0 12px #8ec3733d;font-size:1.15rem;font-weight:900;color:#fff4c6;}
+.dino-skill-node {display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;width:158px;min-height:112px;padding:9px 7px;border:4px solid #a4c881;border-radius:36px;background:linear-gradient(160deg,#427a57,#22493a);box-shadow:0 5px 15px #091c17b0;color:#f1fbe9;cursor:pointer;}
+.dino-skill-node strong {font-size:.9rem;line-height:1.12;overflow-wrap:anywhere;}
+.dino-skill-node span {font-size:.76rem;color:#e8f2c5;}
+.dino-skill-node small {font-size:.7rem;color:#d0e2d4;}
+.dino-skill-node em {font-style:normal;font-size:.75rem;font-weight:800;color:#ffe0a0;}
+.dino-skill-node.maxed {border-color:#eac77d;background:linear-gradient(160deg,#7e7841,#436143);}
+.dino-skill-node.locked {border-color:#bb9c6e;}
+.dino-skill-node:disabled {cursor:not-allowed;filter:saturate(.7);}
+.dino-skill-node:focus-visible,.dino-skill-tabs button:focus-visible {outline:3px solid #fff6b0;outline-offset:4px;}
+.dino-skill-footer {margin:4px 0;font-size:.8rem;color:#a6c4b9;}
+@media(max-width:650px) {
+  .dino-skill-dialog {padding:9px;max-height:96dvh;}
+  .dino-skill-scroll {max-height:60dvh;}
+  .dino-skill-heading h3 {font-size:1.1rem;}
+  .dino-skill-tabs button {padding:7px 8px;font-size:.77rem;}
+  .dino-skill-balance {font-size:.78rem;}
+}
+
+.dino-dna-balances {width:100%;font-size:.8rem;text-align:center;color:#b8e9cb;}
+.dino-dna-yield {color:#ffe4a4!important;}
+
+
+/* Unified skill canopy with four independent bases and a persistent currency bar. */
+.dino-skill-dialog {width:min(1320px,calc(100vw - 16px));max-height:95dvh;overflow:hidden;padding:12px;}
+.dino-skill-dialog[open] {display:flex;flex-direction:column;gap:7px;}
+.dino-skill-heading {display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between;}
+.dino-skill-heading h3 {order:1;font-size:1.2rem;margin:0;}
+.dino-skill-wallet {order:0;display:flex;align-items:center;flex-wrap:wrap;gap:6px;max-width:100%;}
+.dino-skill-wallet-item {display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #698477;border-radius:11px;background:#1d3533;color:#f5f3dc;min-width:68px;font-variant-numeric:tabular-nums;font-size:1rem;}
+.dino-skill-wallet-item.tank {border-color:#93c0fa;}
+.dino-skill-wallet-item.damageDealer {border-color:#efa296;}
+.dino-skill-wallet-item.sniper {border-color:#c8a3ef;}
+.dino-skill-controls {order:2;display:flex;gap:5px;align-items:center;}
+.dino-skill-controls button {min-width:36px;min-height:34px;padding:5px 8px;}
+.dino-skill-controls .dino-skill-close {min-width:auto;}
+.dino-skill-zoom-level {font-size:.82rem;min-width:48px;text-align:center;}
+.dino-currency-icon {width:22px;height:22px;display:block;flex:none;color:#e4db90;}
+.dino-currency-icon.tank {color:#9dc7ff;}
+.dino-currency-icon.damageDealer {color:#ffad9d;}
+.dino-currency-icon.sniper {color:#dcb9ff;}
+.dino-skill-description {margin:1px 0 3px;font-size:.79rem;line-height:1.3;}
+.dino-skill-scroll {flex:1 1 auto;min-height:220px;height:min(72dvh,735px);max-height:none;overflow:auto;overscroll-behavior:contain;margin:0;border-radius:12px;touch-action:pan-x pan-y;}
+.dino-skill-canvas {position:relative;flex:none;}
+.dino-skill-crown {position:absolute;top:0;left:0;margin:0;border-radius:18%;transform-origin:top left;overflow:hidden;background:
+  radial-gradient(ellipse at 25% 25%,#426d3b9c,transparent 36%),
+  radial-gradient(ellipse at 75% 25%,#3e754f9c,transparent 34%),
+  radial-gradient(ellipse at 25% 73%,#5275449c,transparent 36%),
+  radial-gradient(ellipse at 75% 73%,#3b74509c,transparent 35%),#132b23;}
+.dino-skill-crown::before {inset:3%;border:20px solid #61884933;border-radius:39%;box-shadow:0 0 0 50px #6b923517,0 0 0 100px #8cc35c0b;}
+.dino-skill-crown::after {inset:20% 13%;border:18px dotted #a8c66e19;border-radius:38%;}
+.dino-skill-lines {z-index:1;}
+.dino-skill-branch {stroke-width:11;opacity:.92;}
+.dino-skill-branch.sealed {stroke:#313a32;stroke-dasharray:10 14;opacity:.9;}
+.dino-skill-root {width:140px;height:118px;border-radius:40%;border:7px solid #c19a60;font-size:1.12rem;z-index:4;}
+.dino-skill-root.tank {border-color:#93c0fa;background:radial-gradient(circle,#526f90,#324654);}
+.dino-skill-root.damageDealer {border-color:#efa296;background:radial-gradient(circle,#89594b,#483637);}
+.dino-skill-root.sniper {border-color:#c8a3ef;background:radial-gradient(circle,#79618c,#463d65);}
+.dino-skill-node {width:172px;min-height:108px;border-radius:19px;gap:4px;padding:9px 7px;}
+.dino-skill-node.tank:not(.sealed) {border-color:#8abbe4;}
+.dino-skill-node.damageDealer:not(.sealed) {border-color:#ed9d89;}
+.dino-skill-node.sniper:not(.sealed) {border-color:#d3afef;}
+.dino-skill-node.sealed {background:linear-gradient(145deg,#050706,#171819);border:4px solid #464e49;box-shadow:0 7px 20px #000c;filter:none;cursor:not-allowed;color:#c4beb0;}
+.dino-skill-node.sealed::before,.dino-skill-node.sealed::after {content:'';position:absolute;left:-8px;right:-8px;top:50%;height:16px;background:repeating-linear-gradient(90deg,transparent 0 6px,#717774 7px 10px,transparent 11px 18px);border-top:3px solid #757c78;border-bottom:3px solid #515c59;transform:rotate(26deg);pointer-events:none;opacity:.8;}
+.dino-skill-node.sealed::after {transform:rotate(-26deg);}
+.dino-skill-chains {font-size:1.8rem;line-height:1;opacity:.6;position:absolute;top:12px;}
+.dino-skill-lock {font-size:2rem;z-index:1;filter:drop-shadow(0 2px 4px #000);background:#121815b5;border-radius:12px;padding:5px;}
+.dino-skill-node.level-locked {border-color:#cb9b65;}
+.dino-skill-price {display:inline-flex;align-items:center;justify-content:center;gap:4px;font-style:normal;font-size:.8rem;font-weight:800;color:#ffe0a0;}
+.dino-skill-price .dino-currency-icon {width:16px;height:16px;}
+.dino-skill-node span:not(.dino-skill-chains):not(.dino-skill-lock) {font-size:.75rem;}
+.dino-skill-footer {font-size:.75rem;margin:0;}
+.dino-stage.battle #actions {position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:10;width:auto;padding:6px;background:#112f3bda;border:1px solid #5e8488;border-radius:13px;}
+.dino-stage.battle #actions .dino-combat-ability {background:#aedaf3;color:#102b3e;min-width:210px;}
+.dino-stage.battle #actions .dino-combat-ability:disabled {background:#6e878f;color:#e0e7ed;}
+@media(max-width:650px) {
+  .dino-skill-dialog {padding:7px;max-height:98dvh;}
+  .dino-skill-heading {gap:5px;}
+  .dino-skill-heading h3 {font-size:.9rem;}
+  .dino-skill-wallet {gap:3px;}
+  .dino-skill-wallet-item {font-size:.82rem;min-width:48px;padding:5px 6px;}
+  .dino-currency-icon {width:18px;height:18px;}
+  .dino-skill-controls button {min-width:30px;min-height:30px;padding:4px 5px;font-size:.75rem;}
+  .dino-skill-controls .dino-skill-close {font-size:.7rem;}
+  .dino-skill-description {font-size:.68rem;}
+  .dino-skill-scroll {height:60dvh;min-height:180px;}
+  .dino-stage.battle #actions {bottom:3px;}
+  .dino-stage.battle #actions .dino-combat-ability {min-width:160px;padding:7px 10px;font-size:.8rem;}
+}

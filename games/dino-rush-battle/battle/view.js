@@ -22,9 +22,11 @@ export class BattleView {
         this.reservePage = 0;
         this.selected = null;
         this.upgrades = {};
+        this.skills = {};
         this.mode = 'formation';
         this.playback = null;
         this.lastShotFrame = -1;
+        this.lastEffectFrame = -1;
         this.hitSound = createHitSound();
         this.previousHp = new Map();
         this.units = new Map();
@@ -86,7 +88,7 @@ export class BattleView {
             scene.add.text(fieldCenter, 540, 'DEIN TEAM', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#b4e4c4'}).setOrigin(0.5).setDepth(4),
             scene.add.text(fieldCenter, 20, 'GEGNER', {fontFamily: 'system-ui', fontSize: '23px', fontStyle: 'bold', color: '#ffc49b'}).setOrigin(0.5).setDepth(4)];
         this.reserveBackground = scene.add.rectangle(sidebar.center, 310, sidebar.width, 620, 0x142a36, 1).setDepth(-2);
-        this.reserveTitle = scene.add.text(sidebar.center, 25, '', {fontFamily: 'system-ui', fontSize: this.portrait ? '13px' : '17px', fontStyle: 'bold', color: '#d7e5f5'}).setOrigin(0.5).setDepth(3);
+        this.reserveTitle = scene.add.text(sidebar.center - 42, 25, '', {fontFamily: 'system-ui', fontSize: this.portrait ? '13px' : '17px', fontStyle: 'bold', color: '#d7e5f5'}).setOrigin(0.5).setDepth(3);
         this.reserveButtons = [-1, 1].map(direction => {
             const x = sidebar.center + direction * (this.portrait ? 28 : 42);
             const backing = scene.add.rectangle(x, 588, this.portrait ? 46 : 64, 46, 0x42677a, 0.96).setDepth(2);
@@ -94,7 +96,12 @@ export class BattleView {
                 {fontFamily: 'system-ui', fontSize: '35px', color: '#f0ca7c'}).setOrigin(0.5).setDepth(3);
             return {backing, arrow};
         });
-        this.dropMarker = scene.add.graphics().setDepth(5);
+        this.trashElements = [
+            scene.add.rectangle(width - 35, 34, 58, 58, 0x713c45, 0.95).setStrokeStyle(3, 0xf3b4a3).setDepth(7),
+            scene.add.text(width - 35, 33, '🗑', {fontSize: '29px', fontFamily: 'system-ui'}).setOrigin(0.5).setDepth(8),
+            scene.add.text(width - 35, 60, 'DNA', {fontSize: '11px', fontFamily: 'system-ui', fontStyle: 'bold', color: '#ffe3a5'}).setOrigin(0.5).setDepth(8)
+        ];
+        this.dropMarker = scene.add.graphics().setDepth(9);
         this.canvas = scene.game.canvas;
         this.pointerDown = event => this.handlePointerDown(event);
         this.pointerMove = event => this.handlePointerMove(event);
@@ -130,7 +137,7 @@ export class BattleView {
         const visible = this.inventory.slice(from, from + this.reservePageSize);
         return visible.map((unit, index) => ({
             id: unit.id, team: 'reserve', species: unit.species, level: unit.level, ...reserveUnitPosition(index, this.portrait),
-            hp: unit.hp, maxHp: maxHp(unit, this.upgrades)
+            hp: unit.hp, maxHp: maxHp(unit, this.upgrades, this.skills)
         }));
     }
 
@@ -148,6 +155,7 @@ export class BattleView {
     }
 
     targetAtPoint(x, y, excludeId = null) {
+        if (x >= this.width - 72 && y >= 0 && y <= 76) return {trash: true};
         if (x >= reserveSidebar(this.portrait).left && y >= 55 && y <= 559) {
             const unitId = this.unitAtPoint(x, y, excludeId);
             return unitId ? {unitId, reserve: true} : {reserve: true};
@@ -167,8 +175,9 @@ export class BattleView {
         if (!this.dropMarker) return;
         this.dropMarker.clear();
         if (!target || this.mode !== 'formation') return;
-        this.dropMarker.lineStyle(4, 0xffe59b, 1);
-        if (target.reserve) {
+        this.dropMarker.lineStyle(4, target.trash ? 0xff9797 : 0xffe59b, 1);
+        if (target.trash) this.dropMarker.strokeRoundedRect(this.width - 66, 2, 62, 64, 28);
+        else if (target.reserve) {
             const sidebar = reserveSidebar(this.portrait);
             this.dropMarker.strokeRoundedRect(sidebar.left + 4, 54, sidebar.width - 8, 504, 12);
         }
@@ -257,13 +266,14 @@ export class BattleView {
         }
     }
 
-    showFormation(army, enemies, selected = null, upgrades = {}, inventory = []) {
+    showFormation(army, enemies, selected = null, upgrades = {}, inventory = [], skills = {}) {
         this.army = army;
         this.enemies = enemies;
         this.inventory = inventory;
         this.reservePage = Math.min(this.reservePage, Math.max(0, Math.ceil(inventory.length / this.reservePageSize) - 1));
         this.selected = selected;
         this.upgrades = upgrades;
+        this.skills = skills;
         this.mode = 'formation';
         this.playback = null;
         this.drag = null;
@@ -271,14 +281,23 @@ export class BattleView {
         this.render();
     }
 
-    play(frames, complete) {
+    play(frames, complete, onFrame = () => {}) {
         this.hitSound?.unlock();
         this.previousHp = new Map(frames[0].map(unit => [unit.team + ':' + unit.id, unit.hp]));
         this.lastShotFrame = -1;
+        this.lastEffectFrame = -1;
         this.mode = 'battle';
         this.drag = null;
-        this.playback = {frames, index: 0, elapsed: 0, complete};
+        this.playback = {frames, index: 0, elapsed: 0, complete, onFrame};
         this.render();
+        onFrame(0);
+    }
+
+    replacePlaybackFrames(frames) {
+        if (!this.playback || frames.length <= this.playback.index) return false;
+        this.playback.frames = frames;
+        this.render();
+        return true;
     }
 
     update(delta) {
@@ -286,10 +305,11 @@ export class BattleView {
         if (this.playback && this.mode === 'battle') {
             const playback = this.playback;
             playback.elapsed += Math.min(100, delta);
-            while (playback.elapsed >= 95 && playback.index < playback.frames.length - 1) {
-                playback.elapsed -= 95;
+            while (playback.elapsed >= 135 && playback.index < playback.frames.length - 1) {
+                playback.elapsed -= 135;
                 playback.index++;
                 this.render();
+                playback.onFrame(playback.index);
             }
             if (playback.index >= playback.frames.length - 1) {
                 this.playback = null;
@@ -345,6 +365,24 @@ export class BattleView {
         }
         this.hitSound?.hit('impact');
     }
+    emitCombatEffect(effect) {
+        if (!this.scene?.tweens) return;
+        const {x, y} = this.toScreen(effect.x, effect.y);
+        const color = {lightning: 0x9be8ff, shield: 0x8affbd, rage: 0xffa17c, precision: 0xebd0ff}[effect.type] ?? 0xffffff;
+        const large = effect.type === 'lightning';
+        const marker = this.scene.add.ellipse(x, y, large ? 190 : 54, large ? 95 : 36, color, 0.32)
+            .setStrokeStyle(large ? 6 : 3, color, 0.95).setDepth(20);
+        this.scene.tweens.add({
+            targets: marker, alpha: 0, scale: large ? 1.6 : 1.3, duration: large ? 620 : 420, ease: 'Quad.Out',
+            onComplete: () => marker.destroy()
+        });
+        if (large) {
+            const bolt = this.scene.add.text(x, y - 35, '⚡', {fontFamily: 'system-ui', fontSize: '54px', color: '#ccf8ff'})
+                .setOrigin(0.5).setDepth(21);
+            this.scene.tweens.add({targets: bolt, y: y + 20, alpha: 0, duration: 430, onComplete: () => bolt.destroy()});
+            this.hitSound?.hit('impact');
+        }
+    }
     emitRangedProjectile(shot) {
         if (!this.scene?.tweens) return;
         const from = this.toScreen(shot.x, shot.y);
@@ -390,7 +428,12 @@ export class BattleView {
             this.lastShotFrame = this.playback.index;
             for (const shot of frame.shots ?? []) this.emitRangedProjectile(shot);
         }
+        if (!isFormation && this.playback && this.playback.index !== this.lastEffectFrame) {
+            this.lastEffectFrame = this.playback.index;
+            for (const effect of frame.effects ?? []) this.emitCombatEffect(effect);
+        }
         for (const layer of this.formationLayers) layer.setVisible(isFormation);
+        for (const element of this.trashElements ?? []) element.setVisible(isFormation);
         for (const element of [this.reserveBackground, this.reserveTitle, ...this.reserveButtons.flatMap(button => [button.backing, button.arrow])]) {
             element.setVisible(isFormation);
         }

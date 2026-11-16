@@ -19,15 +19,15 @@ test('35-second stage offers fewer than eleven rescue opportunities early on', (
         assert.equal(waves[0].length, 1);
         assert.equal(cages.length, stage < 4 ? 10 : 12);
         assert.ok(cages.every(cage => cage.hp >= 6 && cage.x >= -4.9 && cage.x <= 4.9));
-        assert.ok(cages.every(cage => cage.rarity !== 'common' || RUNNER_SPECIES.includes(cage.species)));
+        assert.ok(cages.every(cage => RUNNER_SPECIES.includes(cage.species)));
         assert.ok(cages.every(cage => cage.rarity !== 'reinforced' || cage.level === 2));
         assert.ok(cages.every(cage => cage.rarity !== 'rare' || SPECIES[cage.species].rank <= 3));
     }
 });
 test('late rare cages advance progression without rescuing an apex directly', () => {
-    const early = createRunnerWave(0, 8, () => 0)[0];
-    const late = createRunnerWave(0, 25, () => 0, ['carnotaurus'])[0];
-    const endgame = createRunnerWave(0, 46, () => 0, ['dilophosaurus'])[0];
+    const early = createRunnerWave(0, 8, () => 0, [], {spawn2: 1})[0];
+    const late = createRunnerWave(0, 25, () => 0, ['carnotaurus'], {spawn3: 1})[0];
+    const endgame = createRunnerWave(0, 46, () => 0, ['dilophosaurus'], {spawn3: 1})[0];
     assert.ok(ADVANCED_SPECIES.includes(early.species));
     assert.equal(early.level, 1);
     assert.ok(ELITE_SPECIES.includes(late.species));

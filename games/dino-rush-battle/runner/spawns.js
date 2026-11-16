@@ -3,6 +3,7 @@ export const ADVANCED_SPECIES = Object.freeze(['allosaurus', 'troodon', 'ankylos
 export const ELITE_SPECIES = Object.freeze(['carnotaurus', 'giganotosaurus', 'dilophosaurus', 'deinonychus',
     'euoplocephalus', 'saichania', 'kentrosaurus', 'miragaia', 'hatzegopteryx', 'arambourgiania',
     'tupandactylus', 'caiuajara']);
+export const APEX_SPECIES = Object.freeze(['tyrannosaurus', 'utahraptor', 'borealopelta', 'dacentrurus', 'thanatosdrakon', 'thalassodromeus']);
 export const TRACK_HALF_WIDTH = 6.5;
 
 export function cageHitPoints(stage, rarity) {
@@ -13,15 +14,23 @@ export function cageHitPoints(stage, rarity) {
     if (rarity === 'rare') return Math.min(65, Math.ceil(base * 3.1));
     throw new Error('Ungültiger Käfig.');
 }
-export function createRunnerWave(wave, stage, random = Math.random, preferredSpecies = []) {
+export function createRunnerWave(wave, stage, random = Math.random, preferredSpecies = [], skills = {}) {
     if (!Number.isInteger(wave) || wave < 0 || !Number.isInteger(stage) || stage < 1) throw new Error('Ungültige Welle.');
-    const count = stage >= 4 && wave > 0 && wave % 4 === 0 ? 2 : 1;
+    const baseline = stage >= 4 && wave > 0 && wave % 4 === 0 ? 2 : 1;
+    const count = baseline + ((skills.spawn1 ?? 0) > 0 && random() < Math.min(0.8, skills.spawn1 * 0.16) ? 1 : 0);
     return Array.from({length: count}, (_, index) => {
         const chance = random();
         const rareChance = stage >= 8 ? Math.min(0.14, 0.07 + (stage - 8) * 0.01) : 0;
         const reinforcedChance = stage >= 3 ? Math.min(0.38, 0.18 + (stage - 3) * 0.025) : 0;
         const rarity = chance < rareChance ? 'rare' : chance < rareChance + reinforcedChance ? 'reinforced' : 'common';
-        const types = rarity === 'rare' ? (stage >= 25 ? ELITE_SPECIES : ADVANCED_SPECIES) : RUNNER_SPECIES;
+        const rankRoll = random();
+        let rank = 1;
+        let threshold = 0;
+        for (const [candidate, probability] of [[4, 0.02], [3, 0.03], [2, 0.05]]) {
+            threshold += (skills['spawn' + candidate] ?? 0) * probability;
+            if (rankRoll < threshold) { rank = candidate; break; }
+        }
+        const types = [null, RUNNER_SPECIES, ADVANCED_SPECIES, ELITE_SPECIES, APEX_SPECIES][rank];
         const preferred = preferredSpecies.filter(species => types.includes(species));
         const pool = preferred.length && random() < 0.55 ? preferred : types;
         const species = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
