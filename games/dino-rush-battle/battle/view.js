@@ -175,7 +175,7 @@ export class BattleView {
         this.dropMarker.clear();
         if (!target || this.mode !== 'formation') return;
         this.dropMarker.lineStyle(4, target.trash ? 0xff9797 : 0xffe59b, 1);
-        if (target.trash) this.dropMarker.strokeCircle(this.width - 35, 34, 31);
+        if (target.trash) this.dropMarker.strokeRoundedRect(this.width - 66, 2, 62, 64, 28);
         else if (target.reserve) {
             const sidebar = reserveSidebar(this.portrait);
             this.dropMarker.strokeRoundedRect(sidebar.left + 4, 54, sidebar.width - 8, 504, 12);
