@@ -8,7 +8,7 @@ import {simulateBattle} from './core/battle.js';
 import {BattleView} from './battle/view.js';
 import {createRunnerHud} from './runner/hud.js';
 import {healingCost} from './core/shop.js';
-import {dnaTypeForDino} from './core/skills.js';
+import {DNA_TYPES, dnaTypeForDino, dnaValue} from './core/skills.js';
 import {renderSkillTree} from './skill-tree/view.js';
 import {createEvolutionChoiceButton} from './battle/evolution-choice.js';
 
@@ -62,6 +62,8 @@ function showSkillTree() {
     if (!state || !['formation', 'rewards', 'gameover'].includes(state.game.run.phase)) return;
     refreshSkillTree();
     if (!skillDialog.open) skillDialog.showModal();
+    const viewport = skillDialog.querySelector('.dino-skill-scroll');
+    viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
 }
 skillToggle?.addEventListener('click', showSkillTree);
 
@@ -215,7 +217,8 @@ function renderFormationStats(unit, run) {
         support: 'Unterstützung', cleave: 'Flächenschaden', poison: 'Gift', reflect: 'Reflexion', heal: 'Heilung'};
     identity.append(make('strong', '', type.name),
         make('small', '', 'Rang ' + type.rank + ' · Tier ' + unit.level + '/3 · ' + type.role),
-        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'));
+        make('small', 'dino-stat-trait', traitNames[unit.trait ?? type.trait] ?? 'Standard'),
+        make('small', 'dino-dna-yield', 'DNA-Wert: ' + dnaValue(unit) + ' ' + DNA_TYPES[dnaTypeForDino(unit)].label));
     header.append(avatar, identity, make('span', 'dino-stat-placement', unit.cell === null ? 'Vorrat' : 'Aufgestellt'));
     const health = make('div', 'dino-stat-health');
     health.append(make('span', '', 'Lebenspunkte'), make('strong', '', unit.hp + ' / ' + maximum));
@@ -251,6 +254,8 @@ function formation() {
     addButton(row, 'Entwicklungsbaum', showEvolutionTree);
     addButton(row, 'Skillbaum / DNA', showSkillTree);
     actions.append(row);
+    const dna = state.game.meta.dna;
+    paragraph(actions, 'Tank-DNA: ' + dna.tank + ' · Damage-Dealer-DNA: ' + dna.damageDealer + ' · Sniper-DNA: ' + dna.sniper).className = 'dino-dna-balances';
 }
 function beginBattle() {
     heading.textContent = 'Dino-Kampf';
