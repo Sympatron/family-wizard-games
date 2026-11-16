@@ -118,6 +118,20 @@ test('class skills and runner skills affect stats while DNA and skill progress p
     assert.equal(game.meta.skills.runner.magnet, 1);
 });
 
+test('regeneration DNA adds percentage points to post-battle recovery for its class', () => {
+    let game = ready();
+    game.meta.dna.damageDealer = 10000;
+    game = spendMax(game, 'damageDealer', 'damage');
+    game = spendMax(game, 'damageDealer', 'health');
+    game = apply(game, 'buy-skill', {group: 'damageDealer', skill: 'regeneration'});
+    const unit = game.run.army[0];
+    const maximum = maxHp(unit, game.meta.upgrades, game.meta.skills);
+    game = apply(game, 'start-battle');
+    game = apply(game, 'resolve-battle', {winner: 'player', survivors: [{id: unit.id, hp: 10}]});
+    assert.equal(game.run.army[0].hp, 10 + Math.round(maximum * 0.30));
+    assert.equal(game.meta.skills.damageDealer.regeneration, 1);
+});
+
 test('saved games from version three receive DNA and skill defaults without resetting progress', () => {
     const old = fresh();
     old.version = 3;
