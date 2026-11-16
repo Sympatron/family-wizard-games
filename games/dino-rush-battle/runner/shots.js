@@ -15,10 +15,10 @@ export function volleyPattern(count, damagePerBullet) {
     });
 }
 
-export function initialRunnerWeaponStats(upgrades = {}, gunUpgrades = {}) {
+export function initialRunnerWeaponStats(upgrades = {}, gunUpgrades = {}, skills = {}) {
     const permanent = Math.max(0, Number(upgrades.runnerDamage) || 0);
-    const damage = Math.max(0.3, Math.min(3, 1 + permanent * 0.12)) + (gunUpgrades.damage ?? 0);
-    const fireRate = 1 + (gunUpgrades.fireRate ?? 0) * 0.5 * SHOT_INTERVAL_SECONDS;
-    const bullets = Math.min(MAX_BULLETS, 1 + (gunUpgrades.bullets ?? 0));
-    return {damage, fireRate, bullets, pickupRange: BASE_PICKUP_RANGE};
+    const damage = Math.max(0.3, Math.min(3, 1 + permanent * 0.12 + (skills.damage ?? 0) * 0.2)) + (gunUpgrades.damage ?? 0);
+    const fireRate = Math.min(2.5, 1 + (gunUpgrades.fireRate ?? 0) * 0.5 * SHOT_INTERVAL_SECONDS + (skills.fireRate ?? 0) * 0.08);
+    const bullets = Math.min(MAX_BULLETS, 1 + (gunUpgrades.bullets ?? 0) + (skills.bullets ?? 0));
+    return {damage, fireRate, bullets, pickupRange: BASE_PICKUP_RANGE + (skills.magnet ?? 0) * 0.5};
 }
