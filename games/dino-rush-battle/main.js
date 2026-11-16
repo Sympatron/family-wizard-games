@@ -57,6 +57,10 @@ function refreshSkillTree() {
     renderSkillTree(skillDialog, state.game, selectedSkillGroup,
         (group, skill) => void execute('buy-skill', {group, skill}),
         group => { selectedSkillGroup = group; refreshSkillTree(); });
+    if (skillDialog.open) {
+        const viewport = skillDialog.querySelector('.dino-skill-scroll');
+        viewport.scrollLeft = Math.max(0, (viewport.scrollWidth - viewport.clientWidth) / 2);
+    }
 }
 function showSkillTree() {
     if (!state || !['formation', 'rewards', 'gameover'].includes(state.game.run.phase)) return;
